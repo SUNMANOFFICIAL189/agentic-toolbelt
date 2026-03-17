@@ -1,10 +1,11 @@
 #!/bin/bash
 # CLAUDE HQ — One-time setup script
-# Adds CLAUDE HQ awareness to your global Claude Code config
-# so it's available from ANY project directory.
+# Run this ONCE in your regular terminal (not inside Claude Code).
+# It adds CLAUDE HQ awareness to your global Claude Code config.
 #
 # Usage: 
-#   git clone https://github.com/SUNMANOFFICIAL189/CLAUDE-HQ.git ~/claude-hq && bash ~/claude-hq/setup.sh
+#   git clone https://github.com/SUNMANOFFICIAL189/CLAUDE-HQ.git ~/claude-hq
+#   bash ~/claude-hq/setup.sh
 
 set -e
 
@@ -15,55 +16,42 @@ HQ_MARKER="# === CLAUDE HQ ==="
 echo "🏢 CLAUDE HQ Setup"
 echo "==================="
 
-# Create ~/.claude if it doesn't exist
 mkdir -p "$CLAUDE_DIR"
 
-# Check if CLAUDE HQ block already exists
 if [ -f "$CLAUDE_MD" ] && grep -q "$HQ_MARKER" "$CLAUDE_MD" 2>/dev/null; then
     echo "✅ CLAUDE HQ is already configured in $CLAUDE_MD"
-    echo "   To update, remove the CLAUDE HQ block and re-run this script."
     exit 0
 fi
 
-# Append CLAUDE HQ block to CLAUDE.md
 cat >> "$CLAUDE_MD" << 'HEREDOC'
 
 # === CLAUDE HQ ===
-# Central command center for all major projects.
+# Central command center: ~/claude-hq/.claude/AGENTS.md
 # Repository: https://github.com/SUNMANOFFICIAL189/CLAUDE-HQ
 
-## CLAUDE HQ Activation Protocol
+## When working inside ~/claude-hq:
+AGENTS.md loads automatically. Read registry.json on session start. 
+Classify the user's task and auto-activate the right tools by running 
+git clone / npm install / plugin install commands. Take initiative — 
+don't wait for the user to paste repo links.
 
-For ANY major project (especially when a PRD is provided), fetch and activate CLAUDE HQ:
-
-1. Fetch the master protocol: https://raw.githubusercontent.com/SUNMANOFFICIAL189/CLAUDE-HQ/main/.claude/AGENTS.md
-2. Fetch the tool registry: https://raw.githubusercontent.com/SUNMANOFFICIAL189/CLAUDE-HQ/main/registry.json
-3. Follow the Tool Selection Algorithm in AGENTS.md
-4. Present activation plan to user
+## When working in ANY other directory:
+If the user says "activate HQ", provides a PRD, or starts a major project:
+1. cd ~/claude-hq && cat registry.json to load the tool inventory
+2. Classify the task against the registry
+3. Clone/install the matching tools
+4. Return to the project directory and begin work
 
 ## Auto-Trigger Rules
-- PRD provided → immediately activate full prd-full-build stack
-- "Build me X" → activate autonomous-agent-system + claude-mem
-- Multi-session project → activate token-efficiency at minimum
-- User says "activate HQ" or "claude hq" → fetch and load full system
-
-## Quick Reference
-- 6 registered tools (2 owned, 4 external)
-- 5 predefined tool combinations
-- System evolves — push improvements via [HQ-EVOLVE] commits
-
-## Evolution
-If you identify improvements to CLAUDE HQ during any session:
-1. Propose the improvement to the user
-2. Push to github.com/SUNMANOFFICIAL189/CLAUDE-HQ with [HQ-EVOLVE] commit
+- PRD provided → full stack activation (autonomous-agent + claude-mem + everything-claude-code + TECCP)
+- "Build me X" → autonomous-agent-system + TECCP
+- "activate HQ" → load full registry and present tools
 # === END CLAUDE HQ ===
 HEREDOC
 
 echo "✅ CLAUDE HQ block added to $CLAUDE_MD"
 echo ""
-echo "How it works:"
-echo "  • Every Claude Code session now knows about CLAUDE HQ"
-echo "  • For major projects, Claude will auto-fetch the full system"
-echo "  • Say 'activate HQ' or provide a PRD to trigger it"
+echo "Now run:"
+echo "  cd ~/claude-hq && claude"
 echo ""
-echo "🚀 Ready. Start Claude Code in any project directory."
+echo "Or from any project: say 'activate HQ' to load the system."
