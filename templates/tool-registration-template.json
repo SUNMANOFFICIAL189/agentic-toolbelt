@@ -1,0 +1,25 @@
+{
+  "_instructions": "Copy this template to register a new tool. Add to registry.json under tools[] or external_tools[].",
+  "id": "[unique-kebab-case-id]",
+  "name": "[Human-Readable Name]",
+  "source": "https://github.com/owner/repo",
+  "raw_playbook": "https://raw.githubusercontent.com/owner/repo/main/path/to/key-file.md",
+  "type": "[github_repo | npm_package | python_package | mcp_server | skill_file]",
+  "category": "[memory | orchestration | testing | documentation | efficiency | automation | other]",
+  "description": "[2-3 sentences on what this does]",
+  "activation_triggers": [
+    "[When to use — specific scenario]",
+    "[Key phrases user might say]"
+  ],
+  "anti_triggers": [
+    "[When NOT to use]"
+  ],
+  "dependencies": [],
+  "setup_instructions": {
+    "method": "[fetch_playbook | clone_and_run | mcp_connect | npm_install | pip_install]",
+    "command": "[activation command or URL]"
+  },
+  "priority": "[ALWAYS | HIGH | MEDIUM | LOW]",
+  "status": "[active | experimental | deprecated]",
+  "added_date": "[YYYY-MM-DD]"
+}
