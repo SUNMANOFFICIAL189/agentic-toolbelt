@@ -4,9 +4,7 @@
 # so it's available from ANY project directory.
 #
 # Usage: 
-#   curl -fsSL https://raw.githubusercontent.com/SUNMANOFFICIAL189/agentic-toolbelt/main/setup.sh | bash
-#   OR
-#   git clone https://github.com/SUNMANOFFICIAL189/agentic-toolbelt.git ~/claude-hq && bash ~/claude-hq/setup.sh
+#   git clone https://github.com/SUNMANOFFICIAL189/CLAUDE-HQ.git ~/claude-hq && bash ~/claude-hq/setup.sh
 
 set -e
 
@@ -32,14 +30,14 @@ cat >> "$CLAUDE_MD" << 'HEREDOC'
 
 # === CLAUDE HQ ===
 # Central command center for all major projects.
-# Repository: https://github.com/SUNMANOFFICIAL189/agentic-toolbelt
+# Repository: https://github.com/SUNMANOFFICIAL189/CLAUDE-HQ
 
 ## CLAUDE HQ Activation Protocol
 
 For ANY major project (especially when a PRD is provided), fetch and activate CLAUDE HQ:
 
-1. Fetch the master protocol: https://raw.githubusercontent.com/SUNMANOFFICIAL189/agentic-toolbelt/main/.claude/AGENTS.md
-2. Fetch the tool registry: https://raw.githubusercontent.com/SUNMANOFFICIAL189/agentic-toolbelt/main/registry.json
+1. Fetch the master protocol: https://raw.githubusercontent.com/SUNMANOFFICIAL189/CLAUDE-HQ/main/.claude/AGENTS.md
+2. Fetch the tool registry: https://raw.githubusercontent.com/SUNMANOFFICIAL189/CLAUDE-HQ/main/registry.json
 3. Follow the Tool Selection Algorithm in AGENTS.md
 4. Present activation plan to user
 
@@ -57,7 +55,7 @@ For ANY major project (especially when a PRD is provided), fetch and activate CL
 ## Evolution
 If you identify improvements to CLAUDE HQ during any session:
 1. Propose the improvement to the user
-2. Push to github.com/SUNMANOFFICIAL189/agentic-toolbelt with [HQ-EVOLVE] commit
+2. Push to github.com/SUNMANOFFICIAL189/CLAUDE-HQ with [HQ-EVOLVE] commit
 # === END CLAUDE HQ ===
 HEREDOC
 
