@@ -1,9 +1,17 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "last_updated": "2026-03-17",
   "owner": "SUNMANOFFICIAL189",
-  "tool_count": 2,
+  "identity": "CLAUDE HQ",
+  "description": "The central command center Claude always references for major projects. Constantly evolving.",
+  "tool_count": 6,
   "skill_count": 1,
+  "auto_trigger_rules": [
+    "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
+    "ANY mention of 'build me', 'create an app', 'develop a system' triggers full-stack activation",
+    "ANY multi-session project triggers token-efficiency at minimum",
+    "Claude should ALWAYS check this registry before starting a major project"
+  ],
   "tools": [
     {
       "id": "autonomous-agent-system",
@@ -12,10 +20,12 @@
       "raw_playbook": "https://raw.githubusercontent.com/SUNMANOFFICIAL189/autonomous-agent-system/main/docs/AUTONOMOUS_AGENT_PLAYBOOK_BIBLE.md",
       "type": "github_repo",
       "category": "orchestration",
+      "owner": "SUNMANOFFICIAL189",
       "description": "Complete playbook for building software products autonomously with Claude. Micro-task decomposition, git-based context continuity, intelligent error handling. Result: working software in 60-240 minutes.",
       "activation_triggers": [
         "Building a complete application or system from scratch",
         "User says build me, create an app, develop a system",
+        "User provides or references a PRD",
         "Complex project requiring 10+ tasks or components",
         "Full-stack development with multiple layers",
         "Projects requiring decomposition into 30-80 micro-tasks"
@@ -32,7 +42,7 @@
         "mcp_required": ["claude-code-bridge", "agentic-orchestrator"],
         "command": "Fetch playbook from raw_playbook URL and follow initialization protocol"
       },
-      "integration_notes": "Always pair with token-efficiency skill. Uses claude-code-bridge + agentic-orchestrator MCPs.",
+      "integration_notes": "Always pair with token-efficiency and claude-mem for large builds. Consider paul-framework for structured loop integrity.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-03-17"
@@ -44,9 +54,11 @@
       "raw_skill": "https://raw.githubusercontent.com/SUNMANOFFICIAL189/token-efficiency-context-continuity/main/SKILL.md",
       "type": "github_repo",
       "category": "efficiency",
+      "owner": "SUNMANOFFICIAL189",
       "description": "TECCP skill system: token discipline, context buffer monitoring, GitHub-backed task tracking, anti-hallucination framework, session lifecycle management.",
       "activation_triggers": [
         "ANY multi-session project",
+        "ANY PRD provided",
         "User mentions token efficiency or context continuity",
         "Long-running conversations approaching context limits",
         "User says pick up where we left off"
@@ -60,8 +72,140 @@
         "method": "fetch_skill",
         "command": "Fetch SKILL.md from raw_skill URL and internalize as operating rules"
       },
-      "integration_notes": "Foundational layer for all non-trivial sessions. Pairs with autonomous-agent-system for builds.",
+      "integration_notes": "Foundational layer for ALL non-trivial sessions. Always active alongside any other tool.",
       "priority": "ALWAYS",
+      "status": "active",
+      "added_date": "2026-03-17"
+    },
+    {
+      "id": "claude-mem",
+      "name": "Claude-Mem Persistent Memory System",
+      "source": "https://github.com/thedotmack/claude-mem",
+      "type": "github_repo",
+      "category": "memory",
+      "owner": "external",
+      "description": "Persistent memory compression system for Claude Code. Automatically captures tool usage observations, generates semantic summaries, and makes them available to future sessions. Includes MCP search tools, progressive disclosure, SQLite + Chroma vector database, and web viewer UI.",
+      "activation_triggers": [
+        "Long-running projects spanning multiple sessions",
+        "Any PRD-driven project where context must persist",
+        "User says remember this or needs cross-session memory",
+        "Projects where decisions and observations must be recalled later",
+        "When token-efficiency CCD alone is insufficient — need richer persistent memory",
+        "Complex codebases where search over past observations adds value"
+      ],
+      "anti_triggers": [
+        "Single-session tasks",
+        "Quick one-off questions",
+        "Tasks where no persistent memory is needed"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "plugin_install",
+        "command": "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem",
+        "requirements": ["Node.js 18+", "Claude Code with plugin support"]
+      },
+      "integration_notes": "Complements token-efficiency TECCP. TECCP handles within-session efficiency and CCD handoff; claude-mem handles persistent cross-session memory with semantic search. Use both for maximum continuity.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-17"
+    },
+    {
+      "id": "ruflo",
+      "name": "RuFlo Enterprise AI Orchestration Platform",
+      "source": "https://github.com/ruvnet/ruflo",
+      "type": "github_repo",
+      "category": "orchestration",
+      "owner": "external",
+      "description": "Production-ready multi-agent AI orchestration for Claude Code. Deploy 60+ specialized agents in coordinated swarms with self-learning capabilities, fault-tolerant consensus, and enterprise-grade security. WASM kernels in Rust power the policy engine.",
+      "activation_triggers": [
+        "Enterprise-scale projects requiring multiple coordinated agents",
+        "Projects needing parallel agent execution with swarm intelligence",
+        "Tasks requiring 60+ specialized agent types",
+        "When autonomous-agent-system needs more sophisticated multi-agent coordination",
+        "Projects requiring self-learning and self-optimizing agent architecture",
+        "User mentions multi-agent, swarm, or enterprise orchestration"
+      ],
+      "anti_triggers": [
+        "Simple single-agent tasks",
+        "Projects where autonomous-agent-system is sufficient",
+        "Quick builds under 2 hours",
+        "Non-Claude-Code environments"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "npm_install",
+        "command": "npm install -g claude-flow",
+        "alternative": "Clone repo and follow README setup"
+      },
+      "integration_notes": "Heavy-duty alternative to autonomous-agent-system for enterprise-scale builds. Use when you need swarm coordination, not just sequential micro-tasks. Pairs well with claude-mem for persistent memory across agent swarms.",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-03-17"
+    },
+    {
+      "id": "everything-claude-code",
+      "name": "Everything Claude Code — Performance Optimization System",
+      "source": "https://github.com/affaan-m/everything-claude-code",
+      "type": "github_repo",
+      "category": "optimization",
+      "owner": "external",
+      "description": "The performance optimization system for AI agent harnesses. 21 agents, 102 skills, 52 commands, hooks, rules, and MCP configs. Covers TDD, code review, security scanning, continuous learning, strategic compaction, multi-agent orchestration, and cross-platform support (Claude Code, Cursor, Codex, OpenCode).",
+      "activation_triggers": [
+        "Need for structured development workflows (TDD, code review, security)",
+        "Want continuous learning — auto-extract patterns from sessions",
+        "Need code review agents, security scanning, or build error resolution",
+        "Projects requiring professional development practices",
+        "User mentions TDD, code review, security scan, or quality gates",
+        "When you want Claude Code to operate with production-grade development practices",
+        "Need AgentShield security auditing for Claude Code configs"
+      ],
+      "anti_triggers": [
+        "Pure prompt engineering or writing tasks",
+        "Non-coding tasks",
+        "Quick prototypes where quality gates would slow things down"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "plugin_install",
+        "command": "/plugin marketplace add affaan-m/everything-claude-code && /plugin install everything-claude-code@everything-claude-code",
+        "alternative": "git clone https://github.com/affaan-m/everything-claude-code.git && ./install.sh typescript"
+      },
+      "integration_notes": "This is the quality and practices layer. Combines well with any build tool (autonomous-agent-system or ruflo) to add TDD, code review, security scanning. The continuous-learning-v2 system can auto-extract patterns that improve future sessions. Strategic compaction skill helps manage token usage.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-17"
+    },
+    {
+      "id": "paul-framework",
+      "name": "PAUL — Plan-Apply-Unify Loop",
+      "source": "https://github.com/ChristopherKahler/paul",
+      "type": "github_repo",
+      "category": "workflow",
+      "owner": "external",
+      "description": "Structured AI-assisted development framework for Claude Code. Enforces Plan-Apply-Unify loop integrity — every plan gets closed with mandatory UNIFY. Acceptance-driven development with BDD criteria, in-session context management, state persistence via STATE.md, and 26 slash commands.",
+      "activation_triggers": [
+        "Projects requiring structured planning with acceptance criteria",
+        "When loop integrity matters — every plan must close properly",
+        "User wants BDD-style Given/When/Then acceptance criteria",
+        "Projects where state must persist across sessions via STATE.md",
+        "When autonomous-agent-system needs more structured planning gates",
+        "User mentions plan, acceptance criteria, loop, or structured development",
+        "Projects where quality and closure matter more than raw speed"
+      ],
+      "anti_triggers": [
+        "Quick prototypes or MVPs where speed beats structure",
+        "Single-file changes",
+        "Research or exploration tasks",
+        "Tasks where the overhead of PLAN/APPLY/UNIFY isn't justified"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "npm_install",
+        "command": "npx paul-framework",
+        "post_install": "Run /paul:init in Claude Code to initialize in your project"
+      },
+      "integration_notes": "PAUL and autonomous-agent-system solve similar problems differently. Autonomous-agent-system is speed-optimized (fire-and-forget micro-tasks). PAUL is quality-optimized (mandatory closure, acceptance criteria). Choose based on project needs, or combine: use PAUL for planning/closure and autonomous-agent-system for execution.",
+      "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-17"
     }
@@ -79,13 +223,72 @@
   ],
   "tool_combinations": [
     {
+      "id": "prd-full-build",
+      "name": "PRD Full Build Stack",
+      "description": "TRIGGERED AUTOMATICALLY when user provides a PRD. Complete toolchain for production application builds.",
+      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["PRD provided", "Product requirements document", "Here is my PRD", "Build from this PRD"],
+      "activation_order": [
+        "1. Apply TECCP skill (session management)",
+        "2. Activate claude-mem (persistent memory — this will be a long project)",
+        "3. Load everything-claude-code practices (TDD, code review, security)",
+        "4. Fetch autonomous-agent-system playbook (execution engine)",
+        "5. Verify MCP servers",
+        "6. Initialize project from PRD",
+        "7. Begin autonomous execution with quality gates"
+      ],
+      "expected_duration": "120-480 minutes (multi-session)"
+    },
+    {
       "id": "full-project-build",
       "name": "Full Project Build Stack",
-      "tools": ["autonomous-agent-system", "token-efficiency-repo"],
+      "description": "For building complete applications without a formal PRD.",
+      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["Build me a", "Create a complete", "Build from scratch"],
-      "activation_order": ["1. Apply TECCP skill", "2. Fetch autonomous playbook", "3. Verify MCPs", "4. Initialize", "5. Execute"],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Activate claude-mem",
+        "3. Fetch autonomous playbook",
+        "4. Verify MCPs",
+        "5. Initialize and execute"
+      ],
       "expected_duration": "60-240 minutes"
+    },
+    {
+      "id": "structured-quality-build",
+      "name": "Structured Quality Build Stack",
+      "description": "When quality and closure matter more than speed. Uses PAUL for loop integrity.",
+      "tools": ["paul-framework", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["Need acceptance criteria", "Structured development", "Quality over speed", "Plan-apply-unify"],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Activate claude-mem",
+        "3. Install paul-framework",
+        "4. Load everything-claude-code practices",
+        "5. Run /paul:init",
+        "6. Begin Plan-Apply-Unify loop"
+      ],
+      "expected_duration": "Multi-session"
+    },
+    {
+      "id": "enterprise-swarm-build",
+      "name": "Enterprise Swarm Build Stack",
+      "description": "For enterprise-scale projects requiring coordinated multi-agent swarms.",
+      "tools": ["ruflo", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["Enterprise project", "Multi-agent swarm", "Large-scale orchestration", "60+ agents"],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Activate claude-mem",
+        "3. Install ruflo",
+        "4. Load everything-claude-code practices",
+        "5. Initialize swarm architecture",
+        "6. Deploy specialized agents"
+      ],
+      "expected_duration": "Multi-session, multi-day"
     },
     {
       "id": "quick-enhancement",
