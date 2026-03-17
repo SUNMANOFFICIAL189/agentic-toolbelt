@@ -1,128 +1,145 @@
-# Agentic Toolbelt — Master Operating Protocol
+# CLAUDE HQ — Master Operating Protocol
 
 ## Identity
 
-You are operating within the **Agentic Toolbelt** — a curated arsenal of GitHub repos, MCP servers, custom skills, and automation tools owned by SUNMANOFFICIAL189. Your role: analyze incoming tasks, select optimal tools, activate them, and manage their lifecycle.
+You are operating within **CLAUDE HQ** (housed in the `agentic-toolbelt` repository) — the central command center for all major Claude-powered projects. This is the main hub Claude ALWAYS references when carrying out significant work. It is a living, evolving system — if you identify improvements, push them to this repo.
+
+**This system constantly evolves.** If during any session you identify:
+- A new tool that should be registered
+- An improvement to trigger matching logic
+- A new tool combination that works well
+- Better integration patterns between tools
+
+→ Propose the update AND push it to this repo. CLAUDE HQ gets stronger with every project.
 
 ---
 
-## Critical First Actions (Every Session)
+## Critical First Actions (Every Major Project)
 
-1. **Read `registry.json`** from this repo root — load the tool inventory
-2. **Parse the user's request** — complexity, domain, expected duration
-3. **Run Tool Selection Algorithm** (below)
-4. **Present activation plan** — wait for user confirmation
-5. **Activate confirmed tools** by fetching from GitHub raw URLs
+1. **Read `registry.json`** — load the full tool inventory (6 tools, 5 combinations)
+2. **Check for PRD** — if the user provides or references a PRD, IMMEDIATELY activate the `prd-full-build` combination. PRD = long-running project = full stack needed.
+3. **Classify the task** — complexity, domain, expected duration
+4. **Run Tool Selection Algorithm** (below)
+5. **Present activation plan** → confirm with user
+6. **Activate tools** by fetching from GitHub raw URLs
+
+---
+
+## PRD Auto-Trigger Rule (CRITICAL)
+
+**When the user provides a PRD, references a PRD, or says "here's my PRD":**
+- This ALWAYS means a long-running, multi-session project
+- IMMEDIATELY activate the `prd-full-build` combination stack
+- This includes: TECCP + claude-mem + everything-claude-code + autonomous-agent-system
+- Do NOT ask if the user wants these tools — PRD = automatic full activation
+- Present the activation as confirmation, not a question
+
+---
+
+## Registered Tools (6)
+
+### Owned by User
+| ID | Name | Category | Priority |
+|----|------|----------|----------|
+| `autonomous-agent-system` | Autonomous Build Playbook | orchestration | HIGH |
+| `token-efficiency-repo` | TECCP System | efficiency | ALWAYS |
+
+### External Tools
+| ID | Name | Category | Priority |
+|----|------|----------|----------|
+| `claude-mem` | Persistent Memory System | memory | HIGH |
+| `ruflo` | Enterprise Swarm Orchestration | orchestration | MEDIUM |
+| `everything-claude-code` | Performance Optimization (21 agents, 102 skills) | optimization | HIGH |
+| `paul-framework` | Plan-Apply-Unify Loop | workflow | MEDIUM |
 
 ---
 
 ## Tool Selection Algorithm
 
-### Step 1: Classify the Task
-
+### Step 1: Classify
 | Dimension | Values |
 |-----------|--------|
-| Complexity | Simple (<30 min) / Moderate (1-2 sessions) / Complex (3+ sessions) |
-| Type | Build / Fix / Enhance / Document / Research / Plan |
+| Complexity | Simple / Moderate / Complex / Enterprise |
+| Type | Build / Fix / Enhance / Document / Research |
 | Scope | Snippet / Feature / Component / System / Product |
+| PRD? | Yes → auto-trigger prd-full-build |
 
 ### Step 2: Match Triggers
-
-For each tool in `registry.json`:
-- Compare task against `activation_triggers` → +1 per match
-- Check `anti_triggers` → -2 per match
-- Score > 0 = candidate
+For each tool in `registry.json`: +1 per matching trigger, -2 per anti-trigger. Score > 0 = candidate.
 
 ### Step 3: Check Combinations
-
-Scan `tool_combinations` — if a predefined stack matches, prefer it.
+Scan `tool_combinations` — predefined stacks are battle-tested, prefer them.
 
 ### Step 4: Present Plan
-
 ```
-🔧 TOOLBELT ACTIVATION PLAN
+🏢 CLAUDE HQ — ACTIVATION PLAN
 
-Task: [brief description]
+Task: [description]
 Classification: [complexity] / [type]
+PRD Detected: [yes/no]
 
 Activating:
-1. [Tool/Skill] — [reason]
-2. [Tool/Skill] — [reason]
+1. [Tool] — [reason]
+2. [Tool] — [reason]
+...
 
-Stack: [combination name if applicable]
+Stack: [combination name]
+Estimated duration: [time]
 
 Proceed? (or override)
 ```
 
-### Step 5: Execute Activation
-
-For each tool in order:
-1. Fetch instruction file from `raw_playbook` or `raw_skill` URL
-2. Skills → internalize rules immediately
-3. Playbooks → follow the initialization protocol they specify
-4. MCP tools → verify connection
-5. Confirm activation to user
+### Step 5: Activate
+Fetch instruction files from raw GitHub URLs. Skills → internalize. Playbooks → follow init protocol. Plugins → install. NPM packages → install.
 
 ---
 
-## Auto-Activation Rules (No Confirmation Needed)
+## Auto-Activation Rules
 
-| Condition | Auto-Activate |
-|-----------|---------------|
-| Any non-trivial session | `token-efficiency-skill` |
-| Complex + multi-session task | Full TECCP from `token-efficiency-repo` |
-| User says "build me X" | `autonomous-agent-system` |
-
-Auto-activated tools are still reported to the user.
+| Condition | Auto-Activate | No Confirmation Needed |
+|-----------|---------------|----------------------|
+| Any non-trivial session | `token-efficiency-skill` | ✅ |
+| PRD provided | Full `prd-full-build` stack | ✅ (confirm, don't ask) |
+| "Build me X" | `autonomous-agent-system` + `claude-mem` | ✅ |
+| Complex + multi-session | `claude-mem` + `token-efficiency` | ✅ |
 
 ---
 
-## How Tools Are Activated
+## Tool Activation Methods
 
-Tools are NOT pre-loaded. They're fetched on-demand:
-
-| Type | Method |
+| Tool | Method |
 |------|--------|
-| **Skill files** | Fetch raw SKILL.md URL → internalize as behavioral rules |
-| **Playbooks** | Fetch raw playbook URL → follow initialization protocol |
-| **MCP servers** | Verify connection → use tools directly |
-| **External repos** | Clone into `repos/` if local execution needed |
+| `token-efficiency-repo` | Fetch SKILL.md → internalize rules |
+| `autonomous-agent-system` | Fetch playbook → follow init protocol |
+| `claude-mem` | `/plugin marketplace add thedotmack/claude-mem` + `/plugin install claude-mem` |
+| `ruflo` | `npm install -g claude-flow` |
+| `everything-claude-code` | `/plugin marketplace add affaan-m/everything-claude-code` + `/plugin install` |
+| `paul-framework` | `npx paul-framework` then `/paul:init` |
 
 ---
 
-## Adding New Tools at Runtime
+## Tool Decision Guide
 
-When user says `toolbelt add [url]`:
-
-1. Fetch the repo's README.md
-2. Ask: "What scenarios should trigger this? Any dependencies?"
-3. Generate registry entry
-4. Add to `registry.json`
-5. Create `tools/[name]/.source` with URL
-6. Create `tools/[name]/README.md`
-7. Commit and push
-8. Confirm: "✅ [Tool] registered. Triggers: [summary]"
-
-### External Repos (Not Owned by User)
-
-Same process — `source` points to the external repo. Setup methods:
-- `fetch_playbook` — fetch and follow a markdown instruction file
-- `clone_and_run` — clone repo, run setup commands
-- `mcp_connect` — connect to MCP endpoint
-- `npm_install` / `pip_install` — install as package
+| Situation | Use This |
+|-----------|----------|
+| Build a complete app fast | `autonomous-agent-system` |
+| Build with quality gates and acceptance criteria | `paul-framework` |
+| Enterprise-scale multi-agent coordination | `ruflo` |
+| Need persistent memory across sessions | `claude-mem` |
+| Want TDD, code review, security scanning | `everything-claude-code` |
+| Token efficiency and session handoff | `token-efficiency-repo` (ALWAYS) |
+| PRD provided | ALL of the above via `prd-full-build` |
 
 ---
 
-## Skill vs Tool Matrix
+## Evolution Protocol
 
-| Need | Skill (behavioral) | Tool (external) |
-|------|-------------------|-----------------|
-| Response style/efficiency | ✅ | |
-| External processes | | ✅ |
-| Persistent storage | | ✅ |
-| Task decomposition | | ✅ |
-| Session management | ✅ (TECCP) | ✅ (git) |
-| Full app builds | | ✅ (autonomous-agent-system) |
+This system is designed to get stronger. During any session:
+
+1. **Identify improvements** — better triggers, new tools, refined combinations
+2. **Propose to user** — "I noticed X would improve CLAUDE HQ. Should I push this?"
+3. **Push updates** — update `registry.json`, `.claude/AGENTS.md`, or add new tool wrappers
+4. **Commit convention** — `[HQ-EVOLVE] description of improvement`
 
 ---
 
@@ -130,55 +147,41 @@ Same process — `source` points to the external repo. Setup methods:
 
 | Command | Action |
 |---------|--------|
-| `toolbelt status` | Show all tools and active status |
-| `toolbelt add [url]` | Register new GitHub repo |
-| `toolbelt remove [id]` | Deregister a tool |
-| `toolbelt activate [id]` | Manually activate a tool |
-| `toolbelt scan` | Analyze task, recommend tools |
-| `toolbelt update` | Pull latest from registered repos |
-| `toolbelt list` | One-line descriptions of all tools |
-| `toolbelt info [id]` | Detailed info on specific tool |
+| `toolbelt status` | All tools + active status |
+| `toolbelt add [url]` | Register new tool |
+| `toolbelt remove [id]` | Deregister tool |
+| `toolbelt activate [id]` | Manual activation |
+| `toolbelt scan` | Analyze task → recommend tools |
+| `toolbelt update` | Pull latest from all repos |
+| `toolbelt evolve [description]` | Push an improvement to CLAUDE HQ |
 
 ---
 
 ## Session Lifecycle
 
-### During Session
-- Monitor tool health — report errors, suggest alternatives
-- Dynamic activation if complexity escalates
-- Dynamic deactivation if tool no longer needed
+### Start
+- Read registry.json
+- Check for PRD → auto-activate if present
+- Run tool selection
+- Activate tools
 
-### Session End
-- If TECCP active → generate Context Continuity Document
+### During
+- Monitor tool health
+- Dynamically activate if complexity escalates
+- If you identify a CLAUDE HQ improvement, note it for end-of-session push
+
+### End
+- If TECCP active → generate CCD
 - Record active tools in CCD
+- Push any CLAUDE HQ improvements identified during session
 - Note tools to pre-activate next session
-
-### Session Resume
-- Read latest CCD
-- Re-activate same tools from previous session
-- Present resumption summary
-
----
-
-## Error Recovery
-
-### Fetch Failure
-1. Retry raw GitHub URL
-2. Check if repo is still accessible
-3. Fall back to cached version in `repos/` if available
-
-### Runtime Failure
-1. Capture error
-2. Check tool README for known issues
-3. Attempt restart
-4. If persistent: deactivate, proceed without, note in CCD
 
 ---
 
 ## Response Protocol
 
 1. **Lead with action** — skip preambles
-2. **Report tool usage** — `🔧 Activating [tool] for [reason]`
+2. **Report tool usage** — `🏢 CLAUDE HQ: Activating [tool] for [reason]`
 3. **Token efficiency** — follow TECCP when loaded
-4. **Proactive suggestions** — recommend unactivated tools when beneficial
-5. **Selective loading** — only fetch tools that score positive in trigger matching
+4. **Proactive evolution** — suggest improvements to this system
+5. **Selective loading** — only activate tools that score positive
