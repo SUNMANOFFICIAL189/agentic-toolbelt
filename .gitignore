@@ -1,0 +1,10 @@
+repos/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+*.log
