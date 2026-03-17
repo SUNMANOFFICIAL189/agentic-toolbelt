@@ -1,0 +1,101 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-03-17",
+  "owner": "SUNMANOFFICIAL189",
+  "tool_count": 2,
+  "skill_count": 1,
+  "tools": [
+    {
+      "id": "autonomous-agent-system",
+      "name": "Autonomous Agent Development System",
+      "source": "https://github.com/SUNMANOFFICIAL189/autonomous-agent-system",
+      "raw_playbook": "https://raw.githubusercontent.com/SUNMANOFFICIAL189/autonomous-agent-system/main/docs/AUTONOMOUS_AGENT_PLAYBOOK_BIBLE.md",
+      "type": "github_repo",
+      "category": "orchestration",
+      "description": "Complete playbook for building software products autonomously with Claude. Micro-task decomposition, git-based context continuity, intelligent error handling. Result: working software in 60-240 minutes.",
+      "activation_triggers": [
+        "Building a complete application or system from scratch",
+        "User says build me, create an app, develop a system",
+        "Complex project requiring 10+ tasks or components",
+        "Full-stack development with multiple layers",
+        "Projects requiring decomposition into 30-80 micro-tasks"
+      ],
+      "anti_triggers": [
+        "Single file edits or bug fixes",
+        "Documentation-only tasks",
+        "Quick code snippets or explanations",
+        "Tasks completable in under 10 minutes"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "fetch_playbook",
+        "mcp_required": ["claude-code-bridge", "agentic-orchestrator"],
+        "command": "Fetch playbook from raw_playbook URL and follow initialization protocol"
+      },
+      "integration_notes": "Always pair with token-efficiency skill. Uses claude-code-bridge + agentic-orchestrator MCPs.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-17"
+    },
+    {
+      "id": "token-efficiency-repo",
+      "name": "Token Efficiency and Context Continuity",
+      "source": "https://github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity",
+      "raw_skill": "https://raw.githubusercontent.com/SUNMANOFFICIAL189/token-efficiency-context-continuity/main/SKILL.md",
+      "type": "github_repo",
+      "category": "efficiency",
+      "description": "TECCP skill system: token discipline, context buffer monitoring, GitHub-backed task tracking, anti-hallucination framework, session lifecycle management.",
+      "activation_triggers": [
+        "ANY multi-session project",
+        "User mentions token efficiency or context continuity",
+        "Long-running conversations approaching context limits",
+        "User says pick up where we left off"
+      ],
+      "anti_triggers": [
+        "Single-turn factual questions",
+        "Quick conversations under one session"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "fetch_skill",
+        "command": "Fetch SKILL.md from raw_skill URL and internalize as operating rules"
+      },
+      "integration_notes": "Foundational layer for all non-trivial sessions. Pairs with autonomous-agent-system for builds.",
+      "priority": "ALWAYS",
+      "status": "active",
+      "added_date": "2026-03-17"
+    }
+  ],
+  "skills": [
+    {
+      "id": "token-efficiency-skill",
+      "name": "TECCP Skill",
+      "source_repo": "token-efficiency-repo",
+      "raw_url": "https://raw.githubusercontent.com/SUNMANOFFICIAL189/token-efficiency-context-continuity/main/SKILL.md",
+      "type": "skill_file",
+      "auto_activate": true,
+      "priority": "ALWAYS"
+    }
+  ],
+  "tool_combinations": [
+    {
+      "id": "full-project-build",
+      "name": "Full Project Build Stack",
+      "tools": ["autonomous-agent-system", "token-efficiency-repo"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["Build me a", "Create a complete", "Build from scratch"],
+      "activation_order": ["1. Apply TECCP skill", "2. Fetch autonomous playbook", "3. Verify MCPs", "4. Initialize", "5. Execute"],
+      "expected_duration": "60-240 minutes"
+    },
+    {
+      "id": "quick-enhancement",
+      "name": "Quick Enhancement Stack",
+      "tools": ["token-efficiency-repo"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["Fix this", "Add feature", "Modify", "Quick change"],
+      "activation_order": ["1. Apply TECCP if needed", "2. Direct implementation"],
+      "expected_duration": "5-30 minutes"
+    }
+  ],
+  "external_tools": []
+}
