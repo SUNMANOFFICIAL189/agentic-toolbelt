@@ -60,7 +60,8 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Wants to create new skills | Clone skill-factory. Read its CLAUDE.md for instructions. Report. |
 | Needs curated skills library | Clone the relevant skills repo (superpowers, awesome-skills, etc). Browse available skills. Report. |
 | Session memory / pick up where left off / behavioral learning | Clone recall-stack. Run `bash setup.sh`. Pairs with claude-mem for full memory coverage. Report. |
-| Content creation / scripts / reels / brand / strategy | Read relevant .skill file(s) from `~/claude-hq/tools/claude-creator-skills/`. Match intent to skill. Load brand-voice-guardian as persistent filter. Report. |
+| Content creation / scripts / reels / brand / strategy | Read relevant .skill file(s) from `~/claude-hq/tools/claude-creator-skills/`. Match intent to skill. Load brand-voice-guardian as persistent filter. Load humanizer as post-processing filter. Report. |
+| Humanize AI text / make copy sound human / marketing copy | Read `~/claude-hq/tools/humanizer/SKILL.md`. Apply 25-pattern detection + two-pass audit. Report. |
 | Niche/specialized skill needed (pentest, SEO, game dev, etc.) | Search `~/claude-hq/tools/agent-skills-mega/skills_index.json` for matching skill. Read from `~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/`. Report. |
 | Needs specialized subagents (language experts, domain agents) | Browse `~/claude-hq/repos/awesome-claude-code-subagents/categories/`. Find matching agent definition. Report. |
 | Programmatic video / Remotion / video-as-code | Read `~/claude-hq/repos/remotion-skills/skills/remotion/`. Report. |
@@ -69,7 +70,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 
 ---
 
-## Registered Tools (17)
+## Registered Tools (18)
 
 ### Owned by User (SUNMANOFFICIAL189)
 | ID | Source | Setup Command |
@@ -95,6 +96,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | `awesome-claude-code-subagents` | github.com/VoltAgent/awesome-claude-code-subagents | `git clone https://github.com/VoltAgent/awesome-claude-code-subagents.git ~/claude-hq/repos/awesome-claude-code-subagents` |
 | `remotion-skills` | github.com/remotion-dev/skills | `git clone https://github.com/remotion-dev/skills.git ~/claude-hq/repos/remotion-skills` |
 | `stitch-skills` | github.com/google-labs-code/stitch-skills | `git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills` |
+| `humanizer` | github.com/blader/humanizer | `cat ~/claude-hq/tools/humanizer/SKILL.md` — read and internalize |
 
 ---
 
@@ -113,7 +115,8 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Creating new Claude Code skills | skill-factory | — |
 | Browsing curated skill libraries | superpowers OR awesome-skills | — |
 | Prediction markets / Polymarket | polymarket-cli | — |
-| Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent) |
+| Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent), humanizer (post-processing) |
+| Humanize AI text / marketing copy / campaigns | humanizer | brand-voice-guardian (if voice card exists) |
 | Audience research / content strategy | claude-creator-skills | — |
 | Repurpose / maximize content | claude-creator-skills | — |
 | Niche skill (pentest, SEO, game dev, etc.) | agent-skills-mega | — |
@@ -138,9 +141,11 @@ First-party skill collection stored at `~/claude-hq/tools/claude-creator-skills/
 | `offer-and-bio-writer.skill` | Bios, landing pages, DM scripts that convert | "write my bio", "landing page copy", offer/DM scripts |
 | `content-performance-debriefer.skill` | Weekly debriefs from analytics — what worked and why | "analyze my performance", "what worked this week" |
 
-**Pipeline order:** Research → Voice → Ideation → Script → Visual → Repurpose → Offer → Debrief
+**Pipeline order:** Research → Voice → Ideation → Script → Visual → Repurpose → Offer → Debrief → **Humanize**
 
-**Key rule:** Always load `brand-voice-guardian` as a persistent filter when any other creator skill is active.
+**Key rules:**
+- Always load `brand-voice-guardian` as a persistent filter when any other creator skill is active.
+- Always run `humanizer` as a post-processing pass on any public-facing text output (marketing copy, social posts, campaigns, landing pages, emails). Read `~/claude-hq/tools/humanizer/SKILL.md` — 25-pattern AI detection + two-pass audit (draft → "what still looks AI?" → final revision).
 
 ---
 

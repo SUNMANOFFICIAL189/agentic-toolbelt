@@ -4,8 +4,8 @@
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 12,
-  "skill_count": 9,
+  "tool_count": 13,
+  "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
     "ANY mention of 'build me', 'create an app', 'develop a system' triggers full-stack activation",
@@ -441,6 +441,41 @@
       "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-21"
+    },
+    {
+      "id": "humanizer",
+      "name": "Humanizer — AI Text Humanization Skill",
+      "source": "https://github.com/blader/humanizer",
+      "raw_skill": "https://raw.githubusercontent.com/blader/humanizer/main/SKILL.md",
+      "type": "github_repo",
+      "category": "content-creation",
+      "owner": "external",
+      "description": "Claude Code skill that removes 25 signs of AI-generated writing to make text sound natural and human. Based on Wikipedia's 'Signs of AI writing' guide (WikiProject AI Cleanup). Detects content patterns (significance inflation, promotional language, vague attributions), language patterns (AI vocabulary, copula avoidance, rule of three), style patterns (em dash/boldface/emoji overuse), communication patterns (chatbot artifacts, sycophantic tone), and filler/hedging. Includes two-pass audit: draft rewrite → 'what still looks AI?' → final revision. v2.3.0.",
+      "activation_triggers": [
+        "User asks to humanize text or make AI text sound human",
+        "User says this sounds like AI or make it sound more natural",
+        "User is writing marketing copy, campaign text, or brand content",
+        "User asks to rewrite or edit text to remove AI patterns",
+        "User mentions AI detection, AI writing patterns, or sounding robotic",
+        "ANY content creation task where the output must pass as human-written",
+        "User says humanize this, make this human, or remove AI patterns",
+        "Content destined for social media, landing pages, emails, or campaigns"
+      ],
+      "anti_triggers": [
+        "Code generation or technical documentation",
+        "Tasks where AI-sounding output is acceptable",
+        "Internal notes or drafts not meant for publication"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "read_skill_files",
+        "command": "Read ~/claude-hq/tools/humanizer/SKILL.md and internalize as operating behavior for this session",
+        "skill_selection_guide": "Load when any text output needs to sound human-written. Especially important for marketing copy, social posts, campaign content, landing pages, and any public-facing writing."
+      },
+      "integration_notes": "Critical companion to claude-creator-skills. Load humanizer as a post-processing filter after killer-scripter, content-repurposer, offer-and-bio-writer, or any skill that generates public-facing text. Also useful standalone for editing any AI-generated content. The two-pass audit (draft → AI detection → final revision) ensures thorough humanization.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-21"
     }
   ],
   "skills": [
@@ -524,6 +559,15 @@
       "type": "skill_file",
       "auto_activate": false,
       "priority": "HIGH"
+    },
+    {
+      "id": "humanizer-skill",
+      "name": "Humanizer — AI Text Humanization",
+      "source_tool": "humanizer",
+      "file": "SKILL.md",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
     }
   ],
   "tool_combinations": [
@@ -602,16 +646,17 @@
     {
       "id": "creator-content-pipeline",
       "name": "Creator Content Pipeline Stack",
-      "description": "Full content creation workflow from audience research to performance measurement. Activates relevant creator skills based on where the user is in the pipeline.",
-      "tools": ["claude-creator-skills"],
-      "skills": ["creator-audience-research", "creator-brand-voice", "creator-content-ideation", "creator-killer-scripter", "creator-visual-storyteller", "creator-content-repurposer", "creator-offer-bio-writer", "creator-performance-debriefer"],
-      "trigger_patterns": ["Write content", "Content strategy", "Write a script", "Repurpose this", "What should I post", "Analyze my performance", "Write my bio", "Brand voice", "Content ideas"],
+      "description": "Full content creation workflow from audience research to performance measurement. Activates relevant creator skills based on where the user is in the pipeline. Humanizer runs as a post-processing filter on all public-facing text.",
+      "tools": ["claude-creator-skills", "humanizer"],
+      "skills": ["creator-audience-research", "creator-brand-voice", "creator-content-ideation", "creator-killer-scripter", "creator-visual-storyteller", "creator-content-repurposer", "creator-offer-bio-writer", "creator-performance-debriefer", "humanizer-skill"],
+      "trigger_patterns": ["Write content", "Content strategy", "Write a script", "Repurpose this", "What should I post", "Analyze my performance", "Write my bio", "Brand voice", "Content ideas", "Humanize this", "Make it sound human", "Remove AI patterns"],
       "activation_order": [
         "1. Identify where user is in the creator pipeline",
         "2. Load brand-voice-guardian if voice card exists (persistent filter)",
         "3. Load the specific skill(s) matching the user's intent",
         "4. For full pipeline: research → voice → ideation → script → visual → repurpose → offer → debrief",
-        "5. Deliver action-ready output in the skill's defined format"
+        "5. Run humanizer as post-processing filter on all public-facing text output",
+        "6. Deliver action-ready output in the skill's defined format"
       ],
       "expected_duration": "15-120 minutes per session"
     },
