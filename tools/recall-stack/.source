@@ -1,0 +1,4 @@
+https://github.com/keshavsuki/recall-stack.git
+# 5-layer memory architecture: CLAUDE.md rules, primer.md auto-rewriting state,
+# git context injection, Hindsight behavioral learning, Obsidian knowledge base.
+# Setup: git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh

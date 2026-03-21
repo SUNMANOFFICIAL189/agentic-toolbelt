@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-03-17",
+  "last_updated": "2026-03-21",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 6,
+  "tool_count": 7,
   "skill_count": 1,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
@@ -208,6 +208,41 @@
       "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-17"
+    },
+    {
+      "id": "recall-stack",
+      "name": "Recall Stack — 5-Layer Memory Architecture",
+      "source": "https://github.com/keshavsuki/recall-stack",
+      "raw_claude_md": "https://raw.githubusercontent.com/keshavsuki/recall-stack/master/CLAUDE.md",
+      "type": "github_repo",
+      "category": "memory",
+      "owner": "external",
+      "description": "5-layer persistent memory system for Claude Code. Layer 1: CLAUDE.md rules. Layer 2: primer.md auto-rewriting session state (survives crashes). Layer 3: Git context injection via SessionStart hook. Layer 4: Hindsight behavioral learning (learns from corrections across sessions via Docker). Layer 5: Obsidian vault as mounted knowledge base.",
+      "activation_triggers": [
+        "ANY multi-session project where session state must survive crashes or restarts",
+        "User wants Claude to remember what was done last session and pick up seamlessly",
+        "Projects where behavioral learning from past corrections is valuable",
+        "User mentions recall, session memory, primer, or pick up where we left off",
+        "Need for automatic git context injection at every session start",
+        "User wants Obsidian vault integrated as knowledge base context",
+        "When claude-mem alone is insufficient — need structured layered memory with auto-rewriting state"
+      ],
+      "anti_triggers": [
+        "Single-session tasks with no continuity needs",
+        "Quick one-off questions or fixes",
+        "Projects where existing CLAUDE.md + claude-mem coverage is sufficient"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_run",
+        "command": "git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh",
+        "optional_flags": "--obsidian ~/path/to/vault (for Layer 5 Obsidian integration)",
+        "requirements": ["Claude Code", "Git", "Docker Desktop (Layer 4 Hindsight only)", "Python 3.x (Layer 4 only)", "Obsidian (Layer 5 only)"]
+      },
+      "integration_notes": "Complements both claude-mem and token-efficiency. claude-mem handles semantic search over past observations. token-efficiency handles within-session token discipline. recall-stack adds structured layered memory: auto-rewriting primer.md for crash-safe session state, git context injection, Hindsight behavioral learning, and Obsidian knowledge base. For maximum memory coverage, use all three together. Layers 1-3 and 5 work without Docker; Layer 4 (Hindsight) gracefully degrades if Docker is unavailable.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-21"
     }
   ],
   "skills": [
@@ -226,17 +261,18 @@
       "id": "prd-full-build",
       "name": "PRD Full Build Stack",
       "description": "TRIGGERED AUTOMATICALLY when user provides a PRD. Complete toolchain for production application builds.",
-      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["PRD provided", "Product requirements document", "Here is my PRD", "Build from this PRD"],
       "activation_order": [
         "1. Apply TECCP skill (session management)",
-        "2. Activate claude-mem (persistent memory — this will be a long project)",
-        "3. Load everything-claude-code practices (TDD, code review, security)",
-        "4. Fetch autonomous-agent-system playbook (execution engine)",
-        "5. Verify MCP servers",
-        "6. Initialize project from PRD",
-        "7. Begin autonomous execution with quality gates"
+        "2. Activate recall-stack (crash-safe session state + git context + behavioral learning)",
+        "3. Activate claude-mem (persistent semantic memory)",
+        "4. Load everything-claude-code practices (TDD, code review, security)",
+        "5. Fetch autonomous-agent-system playbook (execution engine)",
+        "6. Verify MCP servers",
+        "7. Initialize project from PRD",
+        "8. Begin autonomous execution with quality gates"
       ],
       "expected_duration": "120-480 minutes (multi-session)"
     },
@@ -244,15 +280,16 @@
       "id": "full-project-build",
       "name": "Full Project Build Stack",
       "description": "For building complete applications without a formal PRD.",
-      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem"],
+      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "recall-stack"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["Build me a", "Create a complete", "Build from scratch"],
       "activation_order": [
         "1. Apply TECCP skill",
-        "2. Activate claude-mem",
-        "3. Fetch autonomous playbook",
-        "4. Verify MCPs",
-        "5. Initialize and execute"
+        "2. Activate recall-stack (session state + git context)",
+        "3. Activate claude-mem",
+        "4. Fetch autonomous playbook",
+        "5. Verify MCPs",
+        "6. Initialize and execute"
       ],
       "expected_duration": "60-240 minutes"
     },
@@ -260,16 +297,17 @@
       "id": "structured-quality-build",
       "name": "Structured Quality Build Stack",
       "description": "When quality and closure matter more than speed. Uses PAUL for loop integrity.",
-      "tools": ["paul-framework", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "tools": ["paul-framework", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["Need acceptance criteria", "Structured development", "Quality over speed", "Plan-apply-unify"],
       "activation_order": [
         "1. Apply TECCP skill",
-        "2. Activate claude-mem",
-        "3. Install paul-framework",
-        "4. Load everything-claude-code practices",
-        "5. Run /paul:init",
-        "6. Begin Plan-Apply-Unify loop"
+        "2. Activate recall-stack (session state + behavioral learning)",
+        "3. Activate claude-mem",
+        "4. Install paul-framework",
+        "5. Load everything-claude-code practices",
+        "6. Run /paul:init",
+        "7. Begin Plan-Apply-Unify loop"
       ],
       "expected_duration": "Multi-session"
     },
@@ -277,16 +315,17 @@
       "id": "enterprise-swarm-build",
       "name": "Enterprise Swarm Build Stack",
       "description": "For enterprise-scale projects requiring coordinated multi-agent swarms.",
-      "tools": ["ruflo", "token-efficiency-repo", "claude-mem", "everything-claude-code"],
+      "tools": ["ruflo", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["Enterprise project", "Multi-agent swarm", "Large-scale orchestration", "60+ agents"],
       "activation_order": [
         "1. Apply TECCP skill",
-        "2. Activate claude-mem",
-        "3. Install ruflo",
-        "4. Load everything-claude-code practices",
-        "5. Initialize swarm architecture",
-        "6. Deploy specialized agents"
+        "2. Activate recall-stack (session state + behavioral learning across swarm sessions)",
+        "3. Activate claude-mem",
+        "4. Install ruflo",
+        "5. Load everything-claude-code practices",
+        "6. Initialize swarm architecture",
+        "7. Deploy specialized agents"
       ],
       "expected_duration": "Multi-session, multi-day"
     },

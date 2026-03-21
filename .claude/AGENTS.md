@@ -52,18 +52,19 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 |-------------|--------------------------------------|
 | Provides a PRD | Clone autonomous-agent-system + everything-claude-code. Install claude-mem plugin. Read TECCP skill. Report activation. |
 | "Build me X" | Clone autonomous-agent-system. Read TECCP skill. Report activation. |
-| Multi-session project | Read TECCP skill. Install claude-mem plugin. Report activation. |
+| Multi-session project | Read TECCP skill. Install claude-mem plugin. Install recall-stack (session state + behavioral learning). Report activation. |
 | Wants TDD / code review / security | Clone everything-claude-code repo. Run `./install.sh typescript`. Report. |
 | Structured planning needed | Install paul-framework (`npx paul-framework`). Report. |
 | Enterprise/multi-agent scale | Install ruflo (`npm install -g claude-flow`). Report. |
 | Prediction markets / Polymarket | Clone polymarket-cli. Run `cargo install --path .` or use brew. Report. |
 | Wants to create new skills | Clone skill-factory. Read its CLAUDE.md for instructions. Report. |
 | Needs curated skills library | Clone the relevant skills repo (superpowers, awesome-skills, etc). Browse available skills. Report. |
+| Session memory / pick up where left off / behavioral learning | Clone recall-stack. Run `bash setup.sh`. Pairs with claude-mem for full memory coverage. Report. |
 | Quick fix / simple task | Just do it. No tool activation needed. |
 
 ---
 
-## Registered Tools (11)
+## Registered Tools (12)
 
 ### Owned by User (SUNMANOFFICIAL189)
 | ID | Source | Setup Command |
@@ -83,6 +84,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | `awesome-skills-antigravity` | github.com/sickn33/antigravity-awesome-skills | `git clone https://github.com/sickn33/antigravity-awesome-skills.git ~/claude-hq/repos/awesome-skills-antigravity` |
 | `awesome-claude-skills` | github.com/ComposioHQ/awesome-claude-skills | `git clone https://github.com/ComposioHQ/awesome-claude-skills.git ~/claude-hq/repos/awesome-claude-skills` |
 | `superpowers` | github.com/obra/superpowers | `git clone https://github.com/obra/superpowers.git ~/claude-hq/repos/superpowers` |
+| `recall-stack` | github.com/keshavsuki/recall-stack | `git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh` |
 
 ---
 
@@ -90,13 +92,14 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 
 | Situation | Primary Tool | Also Activate |
 |-----------|-------------|---------------|
-| Build a complete app fast | autonomous-agent-system | token-efficiency, claude-mem |
-| PRD provided | autonomous-agent-system | token-efficiency, claude-mem, everything-claude-code |
-| Quality gates + acceptance criteria | paul-framework | token-efficiency, claude-mem |
-| Enterprise multi-agent swarm | ruflo | token-efficiency, claude-mem |
+| Build a complete app fast | autonomous-agent-system | token-efficiency, claude-mem, recall-stack |
+| PRD provided | autonomous-agent-system | token-efficiency, claude-mem, recall-stack, everything-claude-code |
+| Quality gates + acceptance criteria | paul-framework | token-efficiency, claude-mem, recall-stack |
+| Enterprise multi-agent swarm | ruflo | token-efficiency, claude-mem, recall-stack |
 | TDD, code review, security | everything-claude-code | — |
 | Token efficiency / session handoff | token-efficiency-repo | — |
-| Persistent cross-session memory | claude-mem | token-efficiency |
+| Persistent cross-session memory | claude-mem | token-efficiency, recall-stack |
+| Session state + behavioral learning | recall-stack | token-efficiency, claude-mem |
 | Creating new Claude Code skills | skill-factory | — |
 | Browsing curated skill libraries | superpowers OR awesome-skills | — |
 | Prediction markets / Polymarket | polymarket-cli | — |
