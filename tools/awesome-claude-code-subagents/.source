@@ -1,0 +1,5 @@
+https://github.com/VoltAgent/awesome-claude-code-subagents.git
+# 138 specialized subagents across 10 categories: core-dev, language specialists,
+# infrastructure, quality/security, data/AI, dev experience, specialized domains,
+# business/product, meta-orchestration, research/analysis.
+# Setup: git clone https://github.com/VoltAgent/awesome-claude-code-subagents.git ~/claude-hq/repos/awesome-claude-code-subagents

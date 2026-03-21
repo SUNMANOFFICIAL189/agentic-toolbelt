@@ -4,7 +4,7 @@
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 8,
+  "tool_count": 12,
   "skill_count": 9,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
@@ -317,6 +317,128 @@
       },
       "integration_notes": "First-party skill collection stored directly in the CLAUDE HQ repo (not an external reference). Each .skill file is self-contained with activation rules, output formats, and behavioral instructions. Load individual skills based on task, or chain multiple skills for a full content pipeline. Pairs well with brand-voice-guardian as a persistent filter across all other creator skills.",
       "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-21"
+    },
+    {
+      "id": "agent-skills-mega",
+      "name": "Agent Skills Mega Collection — 256 Skills",
+      "source": "local://tools/agent-skills-mega/",
+      "type": "local_skill_collection",
+      "category": "skills-library",
+      "owner": "SUNMANOFFICIAL189",
+      "description": "Massive 256-skill collection with skills_index.json for lookup. Covers AI/ML agents (63), DevOps/infrastructure (47), security/pentesting (36), marketing/SEO (34), web development (29), design/UI (17), game development (10), APIs, databases, and more. Each skill is a directory under skills/skills/[name]/ with instruction files.",
+      "activation_triggers": [
+        "User needs a specialized skill not covered by other registered tools",
+        "User mentions pentesting, security audit, SEO, game dev, or niche topics",
+        "User says find me a skill for X or I need a skill for Y",
+        "Broad development tasks where a specialized skill would improve output quality",
+        "User mentions any topic in the 256-skill index (AI agents, marketing, infrastructure, etc.)"
+      ],
+      "anti_triggers": [
+        "Tasks already covered by a more specific registered tool",
+        "Simple tasks that don't need specialized skill instructions"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "read_skill_files",
+        "command": "Search ~/claude-hq/tools/agent-skills-mega/skills_index.json for matching skill, then read from ~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/",
+        "skill_selection_guide": "Parse skills_index.json to find skills matching the user's intent by name or description. Read the skill's directory for instruction files."
+      },
+      "integration_notes": "This is the catch-all skill library. If no other registered tool has a matching skill, search this index. The skills_index.json provides id, name, description, and path for all 256 skills. First-party — stored directly in CLAUDE HQ repo.",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-03-21"
+    },
+    {
+      "id": "awesome-claude-code-subagents",
+      "name": "Awesome Claude Code Subagents — 138 Specialized Agents",
+      "source": "https://github.com/VoltAgent/awesome-claude-code-subagents",
+      "type": "github_repo",
+      "category": "agents",
+      "owner": "external",
+      "description": "138 specialized Claude Code subagent definitions across 10 categories: core development, language specialists (27), infrastructure (15), quality/security (15), data/AI (13), developer experience (14), specialized domains (13), business/product (12), meta-orchestration (11), and research/analysis (7).",
+      "activation_triggers": [
+        "User needs specialized subagents for Claude Code tasks",
+        "Projects requiring language-specific expertise (Rust, Go, Python, etc.)",
+        "Need for specialized domain agents (fintech, healthcare, IoT, etc.)",
+        "Quality/security auditing subagents needed",
+        "Meta-orchestration — coordinating multiple subagents",
+        "User mentions subagent, specialized agent, or language expert"
+      ],
+      "anti_triggers": [
+        "Simple tasks that don't need specialized agents",
+        "Non-Claude-Code environments"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_browse",
+        "command": "git clone https://github.com/VoltAgent/awesome-claude-code-subagents.git ~/claude-hq/repos/awesome-claude-code-subagents",
+        "usage": "Browse categories/ directory for relevant agent definitions, read and apply them"
+      },
+      "integration_notes": "Complements everything-claude-code (which provides skills/commands/hooks) by adding 138 dedicated subagent definitions. Use when you need a specialized agent role rather than a skill or workflow.",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-03-21"
+    },
+    {
+      "id": "remotion-skills",
+      "name": "Remotion — Programmatic Video with React",
+      "source": "https://github.com/remotion-dev/skills",
+      "type": "github_repo",
+      "category": "video",
+      "owner": "external",
+      "description": "Official Remotion skill for Claude Code. Programmatic video creation using React — compositions, animations, audio sync, rendering to MP4/GIF. Build videos as code.",
+      "activation_triggers": [
+        "User wants to create videos programmatically with React",
+        "User mentions Remotion, programmatic video, or video-as-code",
+        "Projects needing automated video generation or animation rendering",
+        "User says create a video, animate this, or render video"
+      ],
+      "anti_triggers": [
+        "Manual video editing tasks",
+        "Non-React video projects",
+        "Simple image or static content creation"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_browse",
+        "command": "git clone https://github.com/remotion-dev/skills.git ~/claude-hq/repos/remotion-skills",
+        "usage": "Read skills/remotion/ directory for Remotion best practices and patterns"
+      },
+      "integration_notes": "Pairs well with visual-storyteller creator skill for a complete pipeline: visual-storyteller plans the shots, Remotion renders them programmatically.",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-03-21"
+    },
+    {
+      "id": "stitch-skills",
+      "name": "Google Stitch — Design-to-Code Skills",
+      "source": "https://github.com/google-labs-code/stitch-skills",
+      "type": "github_repo",
+      "category": "design",
+      "owner": "external",
+      "description": "Google Labs Stitch skills for Claude Code. 3 skills: design-md (generate design system docs from code), react-components (generate components from design specs), stitch-loop (iterative design-to-code refinement workflow).",
+      "activation_triggers": [
+        "User wants to generate React components from design specs",
+        "User mentions design system, design-to-code, or Stitch",
+        "Projects needing automated design documentation",
+        "Iterative UI refinement workflows",
+        "User says turn this design into code or generate components from this design"
+      ],
+      "anti_triggers": [
+        "Non-React projects",
+        "Backend-only tasks",
+        "Tasks with no design/UI component"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_browse",
+        "command": "git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills",
+        "usage": "Read skills/ directory — design-md, react-components, stitch-loop"
+      },
+      "integration_notes": "Useful for frontend-heavy projects. Pairs with everything-claude-code for full dev practices. The stitch-loop skill provides an iterative refinement workflow that complements PAUL framework's Plan-Apply-Unify loop.",
+      "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-21"
     }

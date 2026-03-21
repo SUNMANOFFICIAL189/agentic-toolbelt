@@ -61,11 +61,15 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Needs curated skills library | Clone the relevant skills repo (superpowers, awesome-skills, etc). Browse available skills. Report. |
 | Session memory / pick up where left off / behavioral learning | Clone recall-stack. Run `bash setup.sh`. Pairs with claude-mem for full memory coverage. Report. |
 | Content creation / scripts / reels / brand / strategy | Read relevant .skill file(s) from `~/claude-hq/tools/claude-creator-skills/`. Match intent to skill. Load brand-voice-guardian as persistent filter. Report. |
+| Niche/specialized skill needed (pentest, SEO, game dev, etc.) | Search `~/claude-hq/tools/agent-skills-mega/skills_index.json` for matching skill. Read from `~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/`. Report. |
+| Needs specialized subagents (language experts, domain agents) | Browse `~/claude-hq/repos/awesome-claude-code-subagents/categories/`. Find matching agent definition. Report. |
+| Programmatic video / Remotion / video-as-code | Read `~/claude-hq/repos/remotion-skills/skills/remotion/`. Report. |
+| Design-to-code / React component generation / design systems | Read `~/claude-hq/repos/stitch-skills/skills/`. Report. |
 | Quick fix / simple task | Just do it. No tool activation needed. |
 
 ---
 
-## Registered Tools (13)
+## Registered Tools (17)
 
 ### Owned by User (SUNMANOFFICIAL189)
 | ID | Source | Setup Command |
@@ -73,6 +77,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | `autonomous-agent-system` | github.com/SUNMANOFFICIAL189/autonomous-agent-system | `git clone https://github.com/SUNMANOFFICIAL189/autonomous-agent-system.git ~/claude-hq/repos/autonomous-agent-system` |
 | `token-efficiency-repo` | github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity | `git clone https://github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity.git ~/claude-hq/repos/token-efficiency` then read `SKILL.md` |
 | `claude-creator-skills` | local://tools/claude-creator-skills/ (8 .skill files) | `cat ~/claude-hq/tools/claude-creator-skills/[skill-name].skill` — read and internalize |
+| `agent-skills-mega` | local://tools/agent-skills-mega/ (256 skills) | Search `~/claude-hq/tools/agent-skills-mega/skills_index.json`, then read from `~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/` |
 
 ### External Tools
 | ID | Source | Setup Command |
@@ -87,6 +92,9 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | `awesome-claude-skills` | github.com/ComposioHQ/awesome-claude-skills | `git clone https://github.com/ComposioHQ/awesome-claude-skills.git ~/claude-hq/repos/awesome-claude-skills` |
 | `superpowers` | github.com/obra/superpowers | `git clone https://github.com/obra/superpowers.git ~/claude-hq/repos/superpowers` |
 | `recall-stack` | github.com/keshavsuki/recall-stack | `git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh` |
+| `awesome-claude-code-subagents` | github.com/VoltAgent/awesome-claude-code-subagents | `git clone https://github.com/VoltAgent/awesome-claude-code-subagents.git ~/claude-hq/repos/awesome-claude-code-subagents` |
+| `remotion-skills` | github.com/remotion-dev/skills | `git clone https://github.com/remotion-dev/skills.git ~/claude-hq/repos/remotion-skills` |
+| `stitch-skills` | github.com/google-labs-code/stitch-skills | `git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills` |
 
 ---
 
@@ -108,6 +116,10 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent) |
 | Audience research / content strategy | claude-creator-skills | — |
 | Repurpose / maximize content | claude-creator-skills | — |
+| Niche skill (pentest, SEO, game dev, etc.) | agent-skills-mega | — |
+| Specialized subagents / language experts | awesome-claude-code-subagents | — |
+| Programmatic video / Remotion | remotion-skills | — |
+| Design-to-code / React from design specs | stitch-skills | — |
 
 ---
 
@@ -132,15 +144,19 @@ First-party skill collection stored at `~/claude-hq/tools/claude-creator-skills/
 
 ---
 
-## Skill Libraries — When to Browse
+## Skill & Agent Libraries — When to Browse
 
-Three repos contain curated skill collections. When the user needs a specialized skill:
+Seven collections are available. Search order for finding a skill:
 
-1. **superpowers** — Cross-platform plugin (Claude Code, Cursor, Codex, OpenCode) with agents, commands, skills, hooks. Install via plugin system.
-2. **awesome-skills-antigravity** — Curated skill collection for Antigravity/Claude Code workflows.
-3. **awesome-claude-skills** — Community-maintained directory of Claude Code skills by ComposioHQ.
+1. **agent-skills-mega** (256 skills, LOCAL) — Broadest coverage. Search `skills_index.json` first. Covers AI/ML, security, marketing, web dev, infra, game dev, and more.
+2. **awesome-claude-code-subagents** (138 agents) — When you need a specialized agent role. 10 categories from core dev to research.
+3. **superpowers** (14 skills) — Cross-platform plugin (Claude Code, Cursor, Codex, OpenCode) with agents, commands, skills, hooks.
+4. **awesome-skills-antigravity** — Curated skill collection for Antigravity/Claude Code workflows.
+5. **awesome-claude-skills** (30+ skills) — Community-maintained directory by ComposioHQ.
+6. **remotion-skills** (1 skill) — Official Remotion programmatic video skill.
+7. **stitch-skills** (3 skills) — Google Labs design-to-code: design-md, react-components, stitch-loop.
 
-**How to use:** Clone the relevant repo, browse its skills directory, find what matches, and either install the skill or copy the relevant SKILL.md content.
+**How to use:** For local collections (agent-skills-mega), search the index file. For external repos, browse the skills directory. Read the matching skill and internalize it.
 
 ---
 

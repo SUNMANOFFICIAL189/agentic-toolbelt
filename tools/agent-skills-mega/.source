@@ -1,0 +1,5 @@
+local://repos/agent-skills-mega/
+# 256-skill mega collection. Index file (skills_index.json) tracked here for fast lookup.
+# Full skill content stored in repos/agent-skills-mega/ (gitignored due to 61MB size).
+# To search: parse skills_index.json for matching skill by name/description.
+# To load: read ~/claude-hq/repos/agent-skills-mega/skills/skills/[skill-name]/ contents.

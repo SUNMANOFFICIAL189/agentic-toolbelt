@@ -1,0 +1,4 @@
+https://github.com/remotion-dev/skills.git
+# Official Remotion video framework skill for Claude Code.
+# Programmatic video creation with React — animations, compositions, rendering.
+# Setup: git clone https://github.com/remotion-dev/skills.git ~/claude-hq/repos/remotion-skills

@@ -1,0 +1,4 @@
+https://github.com/google-labs-code/stitch-skills.git
+# Google Labs Stitch skills: design-md (design system docs), react-components
+# (component generation), stitch-loop (iterative design-to-code workflow).
+# Setup: git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills
