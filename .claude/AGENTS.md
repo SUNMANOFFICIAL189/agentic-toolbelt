@@ -39,8 +39,8 @@ npm install -g [package-name]
 /plugin install [plugin-name]
 ```
 
-### For skill files:
-Read the SKILL.md content and internalize the rules as your operating behavior for this session.
+### For skill files (.md or .skill):
+Read the SKILL.md or `.skill` file content and internalize the rules as your operating behavior for this session. For creator skills: `cat ~/claude-hq/tools/claude-creator-skills/[name].skill`
 
 ---
 
@@ -60,17 +60,19 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Wants to create new skills | Clone skill-factory. Read its CLAUDE.md for instructions. Report. |
 | Needs curated skills library | Clone the relevant skills repo (superpowers, awesome-skills, etc). Browse available skills. Report. |
 | Session memory / pick up where left off / behavioral learning | Clone recall-stack. Run `bash setup.sh`. Pairs with claude-mem for full memory coverage. Report. |
+| Content creation / scripts / reels / brand / strategy | Read relevant .skill file(s) from `~/claude-hq/tools/claude-creator-skills/`. Match intent to skill. Load brand-voice-guardian as persistent filter. Report. |
 | Quick fix / simple task | Just do it. No tool activation needed. |
 
 ---
 
-## Registered Tools (12)
+## Registered Tools (13)
 
 ### Owned by User (SUNMANOFFICIAL189)
 | ID | Source | Setup Command |
 |----|--------|---------------|
 | `autonomous-agent-system` | github.com/SUNMANOFFICIAL189/autonomous-agent-system | `git clone https://github.com/SUNMANOFFICIAL189/autonomous-agent-system.git ~/claude-hq/repos/autonomous-agent-system` |
 | `token-efficiency-repo` | github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity | `git clone https://github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity.git ~/claude-hq/repos/token-efficiency` then read `SKILL.md` |
+| `claude-creator-skills` | local://tools/claude-creator-skills/ (8 .skill files) | `cat ~/claude-hq/tools/claude-creator-skills/[skill-name].skill` — read and internalize |
 
 ### External Tools
 | ID | Source | Setup Command |
@@ -103,6 +105,30 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Creating new Claude Code skills | skill-factory | — |
 | Browsing curated skill libraries | superpowers OR awesome-skills | — |
 | Prediction markets / Polymarket | polymarket-cli | — |
+| Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent) |
+| Audience research / content strategy | claude-creator-skills | — |
+| Repurpose / maximize content | claude-creator-skills | — |
+
+---
+
+## Creator Skills — 8-Skill Content Pipeline
+
+First-party skill collection stored at `~/claude-hq/tools/claude-creator-skills/`. Each `.skill` file is self-contained. Load by reading the file and internalizing it.
+
+| Skill File | What It Does | When to Load |
+|-----------|-------------|--------------|
+| `audience-research-analyst.skill` | Mines comments/DMs/forums for real pain points and content ideas | "what does my audience want", analyze comments, audience research |
+| `brand-voice-guardian.skill` | Extracts and protects authentic creator voice via Voice Card | "does this sound like me", voice consistency, brand voice |
+| `content-ideation.skill` | Generates 15-25 strategic content ideas across formats | "I'm out of ideas", "what should I post", content calendar |
+| `killer-scripter.skill` | Writes Reel/YouTube/carousel scripts with 50 hook templates | "write a script", "write a reel", video/carousel content |
+| `visual-storyteller.skill` | Shot-by-shot plans, art direction, AI image/video prompts | "plan the shots", "make this visual", visual direction |
+| `content-repurposer.skill` | Turns 1 long-form piece into 10-15 platform-native pieces | "repurpose this", "turn this into reels", maximize content |
+| `offer-and-bio-writer.skill` | Bios, landing pages, DM scripts that convert | "write my bio", "landing page copy", offer/DM scripts |
+| `content-performance-debriefer.skill` | Weekly debriefs from analytics — what worked and why | "analyze my performance", "what worked this week" |
+
+**Pipeline order:** Research → Voice → Ideation → Script → Visual → Repurpose → Offer → Debrief
+
+**Key rule:** Always load `brand-voice-guardian` as a persistent filter when any other creator skill is active.
 
 ---
 

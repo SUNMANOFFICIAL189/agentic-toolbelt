@@ -8,3 +8,13 @@ __pycache__/
 *.pyc
 .venv/
 *.log
+# Source/working directories (not tracked — tools/ has canonical copies)
+/claude-creator-skills/
+# Plugin/agent caches
+.agent/
+.awesome-claude-code-subagents/
+.awesome-claude-skills/
+.everything-claude-code/
+.remotion/
+.stitch-skills/
+.superpowers/

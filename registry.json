@@ -4,8 +4,8 @@
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 7,
-  "skill_count": 1,
+  "tool_count": 8,
+  "skill_count": 9,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
     "ANY mention of 'build me', 'create an app', 'develop a system' triggers full-stack activation",
@@ -243,6 +243,82 @@
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-03-21"
+    },
+    {
+      "id": "claude-creator-skills",
+      "name": "Claude Creator Skills — 8-Skill Content Creation System",
+      "source": "local://tools/claude-creator-skills/",
+      "type": "local_skill_collection",
+      "category": "content-creation",
+      "owner": "SUNMANOFFICIAL189",
+      "description": "Complete closed-loop content creator system with 8 specialized skills: audience research, brand voice guardian, content ideation, killer scripter, visual storyteller, content repurposer, offer/bio writer, and performance debriefer. Skills form a pipeline from research to measurement.",
+      "skills_index": {
+        "audience-research-analyst": {
+          "file": "audience-research-analyst.skill",
+          "purpose": "Mine audience comments/DMs/forums to extract real pain points, exact language, and content ideas",
+          "triggers": ["what does my audience want", "analyze these comments", "find content ideas from real people", "audience research"]
+        },
+        "brand-voice-guardian": {
+          "file": "brand-voice-guardian.skill",
+          "purpose": "Extract and protect the creator's authentic voice across all content — builds a reusable Voice Card",
+          "triggers": ["does this sound like me", "make it sound more like me", "this doesn't feel right", "brand voice", "voice consistency"]
+        },
+        "content-ideation": {
+          "file": "content-ideation.skill",
+          "purpose": "Generate 15-25 strategic content ideas from audience pain, personal story, and niche gaps",
+          "triggers": ["I don't know what to post", "I'm out of ideas", "content calendar", "what topics should I cover", "brainstorm content"]
+        },
+        "killer-scripter": {
+          "file": "killer-scripter.skill",
+          "purpose": "Write scripts for Reels, YouTube, carousels that feel like conversation — 50 hook templates included",
+          "triggers": ["write a script", "write a reel", "script this for me", "write video content", "carousel copy"]
+        },
+        "visual-storyteller": {
+          "file": "visual-storyteller.skill",
+          "purpose": "Turn scripts into shot-by-shot visual plans with art direction and AI image/video prompts",
+          "triggers": ["make this visual", "plan the shots", "what should this look like", "shot breakdown", "visual direction"]
+        },
+        "content-repurposer": {
+          "file": "content-repurposer.skill",
+          "purpose": "Turn one long-form piece into 10-15 platform-native pieces across Instagram, YouTube, X, LinkedIn, email",
+          "triggers": ["repurpose this", "turn this into more content", "make this into reels", "maximize this content"]
+        },
+        "offer-and-bio-writer": {
+          "file": "offer-and-bio-writer.skill",
+          "purpose": "Write bios, link-in-bio pages, landing copy, and DM scripts that convert attention into action",
+          "triggers": ["write my bio", "landing page copy", "DM scripts", "offer copy", "link in bio"]
+        },
+        "content-performance-debriefer": {
+          "file": "content-performance-debriefer.skill",
+          "purpose": "Analyze content metrics to reveal what worked, why, and what to do next — weekly debriefs and monthly patterns",
+          "triggers": ["analyze my content performance", "what worked this week", "content analytics", "which posts performed best"]
+        }
+      },
+      "activation_triggers": [
+        "User wants to create content (scripts, reels, carousels, posts, videos)",
+        "User mentions audience research, brand voice, content ideas, or content strategy",
+        "User says write a script, write a reel, plan my content, or repurpose this",
+        "User provides analytics screenshots or asks about content performance",
+        "User wants to build or refine their personal brand or creator business",
+        "User mentions bio, landing page, offer copy, or DM scripts",
+        "User asks for visual direction, shot lists, or AI image/video prompts",
+        "ANY content creation workflow — from ideation through measurement"
+      ],
+      "anti_triggers": [
+        "Pure software development tasks with no content creation",
+        "Non-creator business tasks",
+        "Tasks where no content writing or strategy is needed"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "read_skill_files",
+        "command": "Read the relevant .skill file(s) from ~/claude-hq/tools/claude-creator-skills/ and internalize as operating behavior for this session",
+        "skill_selection_guide": "Match the user's intent to the skills_index triggers. Load one or more skills as needed. For a full content session, load them in pipeline order: research → voice → ideation → script → visual → repurpose → offer → debrief."
+      },
+      "integration_notes": "First-party skill collection stored directly in the CLAUDE HQ repo (not an external reference). Each .skill file is self-contained with activation rules, output formats, and behavioral instructions. Load individual skills based on task, or chain multiple skills for a full content pipeline. Pairs well with brand-voice-guardian as a persistent filter across all other creator skills.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-21"
     }
   ],
   "skills": [
@@ -254,6 +330,78 @@
       "type": "skill_file",
       "auto_activate": true,
       "priority": "ALWAYS"
+    },
+    {
+      "id": "creator-audience-research",
+      "name": "Audience Research Analyst",
+      "source_tool": "claude-creator-skills",
+      "file": "audience-research-analyst.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-brand-voice",
+      "name": "Brand Voice Guardian",
+      "source_tool": "claude-creator-skills",
+      "file": "brand-voice-guardian.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-content-ideation",
+      "name": "Content Ideation Engine",
+      "source_tool": "claude-creator-skills",
+      "file": "content-ideation.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-killer-scripter",
+      "name": "Killer Scripter",
+      "source_tool": "claude-creator-skills",
+      "file": "killer-scripter.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-visual-storyteller",
+      "name": "Visual Storyteller",
+      "source_tool": "claude-creator-skills",
+      "file": "visual-storyteller.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-content-repurposer",
+      "name": "Content Repurposer",
+      "source_tool": "claude-creator-skills",
+      "file": "content-repurposer.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-offer-bio-writer",
+      "name": "Offer & Bio Writer",
+      "source_tool": "claude-creator-skills",
+      "file": "offer-and-bio-writer.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
+    },
+    {
+      "id": "creator-performance-debriefer",
+      "name": "Content Performance Debriefer",
+      "source_tool": "claude-creator-skills",
+      "file": "content-performance-debriefer.skill",
+      "type": "skill_file",
+      "auto_activate": false,
+      "priority": "HIGH"
     }
   ],
   "tool_combinations": [
@@ -328,6 +476,22 @@
         "7. Deploy specialized agents"
       ],
       "expected_duration": "Multi-session, multi-day"
+    },
+    {
+      "id": "creator-content-pipeline",
+      "name": "Creator Content Pipeline Stack",
+      "description": "Full content creation workflow from audience research to performance measurement. Activates relevant creator skills based on where the user is in the pipeline.",
+      "tools": ["claude-creator-skills"],
+      "skills": ["creator-audience-research", "creator-brand-voice", "creator-content-ideation", "creator-killer-scripter", "creator-visual-storyteller", "creator-content-repurposer", "creator-offer-bio-writer", "creator-performance-debriefer"],
+      "trigger_patterns": ["Write content", "Content strategy", "Write a script", "Repurpose this", "What should I post", "Analyze my performance", "Write my bio", "Brand voice", "Content ideas"],
+      "activation_order": [
+        "1. Identify where user is in the creator pipeline",
+        "2. Load brand-voice-guardian if voice card exists (persistent filter)",
+        "3. Load the specific skill(s) matching the user's intent",
+        "4. For full pipeline: research → voice → ideation → script → visual → repurpose → offer → debrief",
+        "5. Deliver action-ready output in the skill's defined format"
+      ],
+      "expected_duration": "15-120 minutes per session"
     },
     {
       "id": "quick-enhancement",
