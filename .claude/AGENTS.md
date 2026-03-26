@@ -54,7 +54,8 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | "Build me X" | Clone autonomous-agent-system. Read TECCP skill. Report activation. |
 | Multi-session project | Read TECCP skill. Install claude-mem plugin. Install recall-stack (session state + behavioral learning). Report activation. |
 | Wants TDD / code review / security | Clone everything-claude-code repo. Run `./install.sh typescript`. Report. |
-| Structured planning needed | Install paul-framework (`npx paul-framework`). Report. |
+| New idea / project from scratch / needs planning | Install SEED (`npm i -g @chrisai/seed`). Run `/seed` for guided ideation → PLANNING.md. Then `/seed launch` to graduate into PAUL. Report. |
+| Structured planning needed (requirements already clear) | Install paul-framework (`npx paul-framework`). Report. |
 | Enterprise/multi-agent scale | Install ruflo (`npm install -g claude-flow`). Report. |
 | Prediction markets / Polymarket | Clone polymarket-cli. Run `cargo install --path .` or use brew. Report. |
 | Wants to create new skills | Clone skill-factory. Read its CLAUDE.md for instructions. Report. |
@@ -70,7 +71,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 
 ---
 
-## Registered Tools (18)
+## Registered Tools (19)
 
 ### Owned by User (SUNMANOFFICIAL189)
 | ID | Source | Setup Command |
@@ -87,6 +88,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | `ruflo` | github.com/ruvnet/ruflo | `npm install -g claude-flow` |
 | `everything-claude-code` | github.com/affaan-m/everything-claude-code | `git clone https://github.com/affaan-m/everything-claude-code.git ~/claude-hq/repos/everything-claude-code && cd ~/claude-hq/repos/everything-claude-code && ./install.sh typescript` |
 | `paul-framework` | github.com/ChristopherKahler/paul | `npx paul-framework` |
+| `seed` | github.com/ChristopherKahler/seed | `npm i -g @chrisai/seed` then `/seed` in Claude Code |
 | `polymarket-cli` | github.com/Polymarket/polymarket-cli | `git clone https://github.com/Polymarket/polymarket-cli.git ~/claude-hq/repos/polymarket-cli` |
 | `skill-factory` | github.com/alirezarezvani/claude-code-skill-factory | `git clone https://github.com/alirezarezvani/claude-code-skill-factory.git ~/claude-hq/repos/skill-factory` |
 | `awesome-skills-antigravity` | github.com/sickn33/antigravity-awesome-skills | `git clone https://github.com/sickn33/antigravity-awesome-skills.git ~/claude-hq/repos/awesome-skills-antigravity` |
@@ -106,7 +108,8 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 |-----------|-------------|---------------|
 | Build a complete app fast | autonomous-agent-system | token-efficiency, claude-mem, recall-stack |
 | PRD provided | autonomous-agent-system | token-efficiency, claude-mem, recall-stack, everything-claude-code |
-| Quality gates + acceptance criteria | paul-framework | token-efficiency, claude-mem, recall-stack |
+| New idea → plan → build (full pipeline) | seed → paul-framework | token-efficiency, claude-mem, recall-stack |
+| Quality gates + acceptance criteria | paul-framework | token-efficiency, claude-mem, recall-stack, (seed first if requirements unclear) |
 | Enterprise multi-agent swarm | ruflo | token-efficiency, claude-mem, recall-stack |
 | TDD, code review, security | everything-claude-code | — |
 | Token efficiency / session handoff | token-efficiency-repo | — |
@@ -115,6 +118,7 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Creating new Claude Code skills | skill-factory | — |
 | Browsing curated skill libraries | superpowers OR awesome-skills | — |
 | Prediction markets / Polymarket | polymarket-cli | — |
+| Campaign / marketing launch planning | seed (campaign type) | claude-creator-skills, humanizer |
 | Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent), humanizer (post-processing) |
 | Humanize AI text / marketing copy / campaigns | humanizer | brand-voice-guardian (if voice card exists) |
 | Audience research / content strategy | claude-creator-skills | — |
@@ -123,6 +127,35 @@ When the user gives you a task, classify it and activate tools IMMEDIATELY:
 | Specialized subagents / language experts | awesome-claude-code-subagents | — |
 | Programmatic video / Remotion | remotion-skills | — |
 | Design-to-code / React from design specs | stitch-skills | — |
+
+---
+
+## SEED → PAUL — Ideation-to-Build Pipeline
+
+SEED (by Chris Kahler, same author as PAUL) is the ideation phase that precedes building. **Always consider SEED when a user starts a new project from an idea.**
+
+```
+Raw idea → /seed → Guided ideation → PLANNING.md → /seed launch → PAUL managed build
+```
+
+| Command | What It Does |
+|---------|-------------|
+| `/seed` | Start guided ideation — select project type, explore collaboratively, produce PLANNING.md |
+| `/seed graduate` | Move completed plan to `apps/{name}/` with git init + README |
+| `/seed launch` | Graduate + headless PAUL init — zero-friction handoff |
+| `/seed status` | Show all projects in ideation pipeline |
+| `/seed add-type` | Create a custom project type |
+
+**5 Project Types** (each shapes the conversation differently):
+- **Application** (deep rigor) — Software with UI, data model, API, deployment
+- **Workflow** (standard) — Claude Code commands, hooks, skills
+- **Client** (standard) — Client websites, conversion, content
+- **Utility** (tight) — Small tools, scripts, resists scope creep
+- **Campaign** (creative) — Content, marketing, launches — timeline-driven
+
+**Key rule:** SEED produces a PLANNING.md rich enough that PAUL derives its entire structure without re-asking questions. `/seed launch` wraps graduation + headless PAUL init in one command.
+
+**Campaign type + Creator Skills:** For campaign-type projects, SEED's ideation naturally feeds into the creator content pipeline (audience research → scripts → visual → repurpose → humanize).
 
 ---
 

@@ -1,0 +1,12 @@
+SEED — Typed Project Incubator
+Source: https://github.com/ChristopherKahler/seed.git
+Type: external_tool
+Category: workflow / ideation
+Version: 0.1.3
+Author: Chris Kahler (same as PAUL)
+Cloned to: ~/claude-hq/repos/seed/
+Install: npm i -g @chrisai/seed
+Key files: seed.md (entry point), tasks/ (5 task files), data/ (5 type configs), templates/ (5 PLANNING.md templates), checklists/ (quality gate)
+Commands: /seed, /seed graduate, /seed launch, /seed status, /seed add-type
+Project types: Application (deep), Workflow (standard), Client (standard), Utility (tight), Campaign (creative)
+PAUL integration: /seed launch → graduates plan → headless PAUL init from PLANNING.md

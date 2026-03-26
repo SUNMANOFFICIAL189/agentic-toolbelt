@@ -4,7 +4,7 @@
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 13,
+  "tool_count": 14,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
@@ -204,10 +204,46 @@
         "command": "npx paul-framework",
         "post_install": "Run /paul:init in Claude Code to initialize in your project"
       },
-      "integration_notes": "PAUL and autonomous-agent-system solve similar problems differently. Autonomous-agent-system is speed-optimized (fire-and-forget micro-tasks). PAUL is quality-optimized (mandatory closure, acceptance criteria). Choose based on project needs, or combine: use PAUL for planning/closure and autonomous-agent-system for execution.",
+      "integration_notes": "PAUL and autonomous-agent-system solve similar problems differently. Autonomous-agent-system is speed-optimized (fire-and-forget micro-tasks). PAUL is quality-optimized (mandatory closure, acceptance criteria). Choose based on project needs, or combine: use PAUL for planning/closure and autonomous-agent-system for execution. SEED is the ideation phase that feeds into PAUL — always consider SEED first when starting a new project.",
       "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-17"
+    },
+    {
+      "id": "seed",
+      "name": "SEED — Typed Project Incubator",
+      "source": "https://github.com/ChristopherKahler/seed",
+      "type": "github_repo",
+      "category": "workflow",
+      "owner": "external",
+      "description": "AI project incubator that takes raw ideas through type-aware guided exploration and produces structured PLANNING.md files ready for building. 5 project types (Application/deep, Workflow/standard, Client/standard, Utility/tight, Campaign/creative) each with adaptive rigor, guided conversation sections, and type-specific templates. Coach persona brainstorms alongside you — not an interrogator. Graduates mature plans into buildable project directories. /seed launch does graduation + headless PAUL init in one command — zero-friction ideation-to-build handoff. Pure markdown, zero runtime deps.",
+      "activation_triggers": [
+        "User has a new project idea and needs to plan it out before building",
+        "User says I have an idea, I want to plan, let me think this through, or seed this",
+        "ANY new project that will use PAUL — SEED should run first to produce PLANNING.md",
+        "User wants guided ideation or brainstorming for an app, workflow, client site, utility, or campaign",
+        "User mentions campaign planning, content campaign, or marketing launch planning",
+        "User is starting a project from scratch and hasn't defined requirements yet",
+        "User provides a vague idea that needs structured exploration before building",
+        "User says /seed or /seed launch"
+      ],
+      "anti_triggers": [
+        "User already has a detailed PRD or PLANNING.md ready",
+        "Quick fixes, bug fixes, or single-file changes",
+        "Projects already in progress with PAUL",
+        "Tasks where requirements are already crystal clear"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "npm_install",
+        "command": "npm i -g @chrisai/seed",
+        "post_install": "Run /seed in Claude Code to start guided ideation",
+        "alternative": "git clone https://github.com/ChristopherKahler/seed.git ~/claude-hq/repos/seed"
+      },
+      "integration_notes": "SEED is the ideation phase that precedes PAUL. The workflow is: SEED (ideate → PLANNING.md) → PAUL (structured build from PLANNING.md). /seed launch wraps both: graduates the plan and initializes PAUL with headless context so PAUL never re-asks questions SEED already answered. For campaign-type projects, pairs naturally with claude-creator-skills and humanizer. Part of the Chris Kahler ecosystem (PAUL, AEGIS, BASE, CARL, Skillsmith).",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-03-26"
     },
     {
       "id": "recall-stack",
@@ -608,9 +644,27 @@
       "expected_duration": "60-240 minutes"
     },
     {
+      "id": "seed-to-paul-pipeline",
+      "name": "SEED → PAUL Ideation-to-Build Pipeline",
+      "description": "Complete idea-to-build pipeline. SEED guides ideation and produces a structured PLANNING.md, then PAUL picks it up for managed build execution. Use when starting a new project from an idea.",
+      "tools": ["seed", "paul-framework", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
+      "skills": ["token-efficiency-skill"],
+      "trigger_patterns": ["I have an idea", "New project from scratch", "Plan and build", "Seed this", "Let me think this through then build", "Ideate and build"],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Activate recall-stack (session state + behavioral learning)",
+        "3. Activate claude-mem",
+        "4. Run /seed — guided ideation produces PLANNING.md",
+        "5. Run /seed launch — graduates plan + headless PAUL init",
+        "6. Load everything-claude-code practices",
+        "7. Begin PAUL Plan-Apply-Unify loop from PLANNING.md"
+      ],
+      "expected_duration": "Multi-session"
+    },
+    {
       "id": "structured-quality-build",
       "name": "Structured Quality Build Stack",
-      "description": "When quality and closure matter more than speed. Uses PAUL for loop integrity.",
+      "description": "When quality and closure matter more than speed. Uses PAUL for loop integrity. Consider running SEED first if requirements aren't fully defined.",
       "tools": ["paul-framework", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
       "skills": ["token-efficiency-skill"],
       "trigger_patterns": ["Need acceptance criteria", "Structured development", "Quality over speed", "Plan-apply-unify"],
@@ -618,10 +672,11 @@
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning)",
         "3. Activate claude-mem",
-        "4. Install paul-framework",
-        "5. Load everything-claude-code practices",
-        "6. Run /paul:init",
-        "7. Begin Plan-Apply-Unify loop"
+        "4. (Optional) Run SEED first if requirements unclear — /seed produces PLANNING.md",
+        "5. Install paul-framework",
+        "6. Load everything-claude-code practices",
+        "7. Run /paul:init (reads PLANNING.md if SEED was used)",
+        "8. Begin Plan-Apply-Unify loop"
       ],
       "expected_duration": "Multi-session"
     },
