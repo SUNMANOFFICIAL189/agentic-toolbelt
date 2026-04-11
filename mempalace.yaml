@@ -1,0 +1,30 @@
+wing: claude_hq
+rooms:
+- name: repos
+  description: Files from repos/
+  keywords:
+  - repos
+  - repos
+- name: scripts
+  description: Files from tools/
+  keywords:
+  - scripts
+  - tools
+- name: commander
+  description: Files from commander/
+  keywords:
+  - commander
+  - commander
+- name: recipes
+  description: Files from recipes/
+  keywords:
+  - recipes
+  - recipes
+- name: templates
+  description: Files from templates/
+  keywords:
+  - templates
+  - templates
+- name: general
+  description: Files that don't fit other rooms
+  keywords: []
