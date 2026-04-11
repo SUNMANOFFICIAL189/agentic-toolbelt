@@ -1,0 +1,4 @@
+https://github.com/milla-jovovich/mempalace.git
+# Verbatim conversation storage in ChromaDB. Palace architecture.
+# 170 tokens on startup, semantic search on demand. 19 MCP tools.
+# Install: pip install mempalace && mempalace install

@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-03-21",
+  "last_updated": "2026-04-11",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
-  "description": "The central command center Claude always references for major projects. Constantly evolving.",
-  "tool_count": 14,
+  "description": "The central command center for JARVIS — an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
+  "tool_count": 25,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
@@ -39,7 +39,10 @@
       "dependencies": [],
       "setup_instructions": {
         "method": "fetch_playbook",
-        "mcp_required": ["claude-code-bridge", "agentic-orchestrator"],
+        "mcp_required": [
+          "claude-code-bridge",
+          "agentic-orchestrator"
+        ],
         "command": "Fetch playbook from raw_playbook URL and follow initialization protocol"
       },
       "integration_notes": "Always pair with token-efficiency and claude-mem for large builds. Consider paul-framework for structured loop integrity.",
@@ -102,7 +105,10 @@
       "setup_instructions": {
         "method": "plugin_install",
         "command": "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem",
-        "requirements": ["Node.js 18+", "Claude Code with plugin support"]
+        "requirements": [
+          "Node.js 18+",
+          "Claude Code with plugin support"
+        ]
       },
       "integration_notes": "Complements token-efficiency TECCP. TECCP handles within-session efficiency and CCD handoff; claude-mem handles persistent cross-session memory with semantic search. Use both for maximum continuity.",
       "priority": "HIGH",
@@ -273,7 +279,13 @@
         "method": "clone_and_run",
         "command": "git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh",
         "optional_flags": "--obsidian ~/path/to/vault (for Layer 5 Obsidian integration)",
-        "requirements": ["Claude Code", "Git", "Docker Desktop (Layer 4 Hindsight only)", "Python 3.x (Layer 4 only)", "Obsidian (Layer 5 only)"]
+        "requirements": [
+          "Claude Code",
+          "Git",
+          "Docker Desktop (Layer 4 Hindsight only)",
+          "Python 3.x (Layer 4 only)",
+          "Obsidian (Layer 5 only)"
+        ]
       },
       "integration_notes": "Complements both claude-mem and token-efficiency. claude-mem handles semantic search over past observations. token-efficiency handles within-session token discipline. recall-stack adds structured layered memory: auto-rewriting primer.md for crash-safe session state, git context injection, Hindsight behavioral learning, and Obsidian knowledge base. For maximum memory coverage, use all three together. Layers 1-3 and 5 work without Docker; Layer 4 (Hindsight) gracefully degrades if Docker is unavailable.",
       "priority": "HIGH",
@@ -292,42 +304,87 @@
         "audience-research-analyst": {
           "file": "audience-research-analyst.skill",
           "purpose": "Mine audience comments/DMs/forums to extract real pain points, exact language, and content ideas",
-          "triggers": ["what does my audience want", "analyze these comments", "find content ideas from real people", "audience research"]
+          "triggers": [
+            "what does my audience want",
+            "analyze these comments",
+            "find content ideas from real people",
+            "audience research"
+          ]
         },
         "brand-voice-guardian": {
           "file": "brand-voice-guardian.skill",
           "purpose": "Extract and protect the creator's authentic voice across all content — builds a reusable Voice Card",
-          "triggers": ["does this sound like me", "make it sound more like me", "this doesn't feel right", "brand voice", "voice consistency"]
+          "triggers": [
+            "does this sound like me",
+            "make it sound more like me",
+            "this doesn't feel right",
+            "brand voice",
+            "voice consistency"
+          ]
         },
         "content-ideation": {
           "file": "content-ideation.skill",
           "purpose": "Generate 15-25 strategic content ideas from audience pain, personal story, and niche gaps",
-          "triggers": ["I don't know what to post", "I'm out of ideas", "content calendar", "what topics should I cover", "brainstorm content"]
+          "triggers": [
+            "I don't know what to post",
+            "I'm out of ideas",
+            "content calendar",
+            "what topics should I cover",
+            "brainstorm content"
+          ]
         },
         "killer-scripter": {
           "file": "killer-scripter.skill",
           "purpose": "Write scripts for Reels, YouTube, carousels that feel like conversation — 50 hook templates included",
-          "triggers": ["write a script", "write a reel", "script this for me", "write video content", "carousel copy"]
+          "triggers": [
+            "write a script",
+            "write a reel",
+            "script this for me",
+            "write video content",
+            "carousel copy"
+          ]
         },
         "visual-storyteller": {
           "file": "visual-storyteller.skill",
           "purpose": "Turn scripts into shot-by-shot visual plans with art direction and AI image/video prompts",
-          "triggers": ["make this visual", "plan the shots", "what should this look like", "shot breakdown", "visual direction"]
+          "triggers": [
+            "make this visual",
+            "plan the shots",
+            "what should this look like",
+            "shot breakdown",
+            "visual direction"
+          ]
         },
         "content-repurposer": {
           "file": "content-repurposer.skill",
           "purpose": "Turn one long-form piece into 10-15 platform-native pieces across Instagram, YouTube, X, LinkedIn, email",
-          "triggers": ["repurpose this", "turn this into more content", "make this into reels", "maximize this content"]
+          "triggers": [
+            "repurpose this",
+            "turn this into more content",
+            "make this into reels",
+            "maximize this content"
+          ]
         },
         "offer-and-bio-writer": {
           "file": "offer-and-bio-writer.skill",
           "purpose": "Write bios, link-in-bio pages, landing copy, and DM scripts that convert attention into action",
-          "triggers": ["write my bio", "landing page copy", "DM scripts", "offer copy", "link in bio"]
+          "triggers": [
+            "write my bio",
+            "landing page copy",
+            "DM scripts",
+            "offer copy",
+            "link in bio"
+          ]
         },
         "content-performance-debriefer": {
           "file": "content-performance-debriefer.skill",
           "purpose": "Analyze content metrics to reveal what worked, why, and what to do next — weekly debriefs and monthly patterns",
-          "triggers": ["analyze my content performance", "what worked this week", "content analytics", "which posts performed best"]
+          "triggers": [
+            "analyze my content performance",
+            "what worked this week",
+            "content analytics",
+            "which posts performed best"
+          ]
         }
       },
       "activation_triggers": [
@@ -512,6 +569,387 @@
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-03-21"
+    },
+    {
+      "id": "code-review-graph",
+      "name": "Code Review Graph — Token-Efficient Codebase Knowledge Graph",
+      "source": "https://github.com/tirth8205/code-review-graph",
+      "type": "github_repo",
+      "category": "efficiency",
+      "owner": "external",
+      "description": "Local knowledge graph for Claude Code. Tree-sitter parsing across 19 languages, SQLite-backed. 6.8x fewer tokens on code reviews, up to 49x on daily coding tasks. Incremental updates in under 2 seconds. MCP tools for precise context injection.",
+      "activation_triggers": [
+        "ANY coding project — this should be always active",
+        "Code reviews or pull request analysis",
+        "Navigating unfamiliar codebases",
+        "Any task where Claude would normally read entire source files",
+        "Large monorepos where token waste is most painful"
+      ],
+      "anti_triggers": [
+        "Non-coding tasks (content, research, design-only)",
+        "Projects with fewer than 5 files"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, local SQLite, zero cloud calls"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "pip_install",
+        "command": "pip install code-review-graph && code-review-graph install",
+        "alternative": "claude plugin add tirth8205/code-review-graph"
+      },
+      "integration_notes": "Foundational token saver. Always pair with TECCP. code-review-graph handles codebase-level efficiency (which files to read), TECCP handles session-level efficiency (how to respond). Together they can reduce token usage by 80%+.",
+      "priority": "ALWAYS",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "graphify",
+      "name": "Graphify — Multimodal Knowledge Graph Builder",
+      "source": "https://github.com/safishamsi/graphify",
+      "type": "github_repo",
+      "category": "knowledge",
+      "owner": "external",
+      "description": "Turn any folder of code, docs, PDFs, images, videos into a queryable knowledge graph. 71.5x fewer tokens per query. Native Obsidian vault export. Tree-sitter AST for 20 languages plus LLM semantic extraction. Leiden clustering, god node detection, community analysis.",
+      "activation_triggers": [
+        "Understanding a new codebase or project",
+        "Building a knowledge base from mixed content (code + docs + papers + images)",
+        "User says /graphify or wants to map a project",
+        "Need to export project knowledge to Obsidian",
+        "Research tasks requiring structured knowledge from multiple sources",
+        "Any Karpathy-style /raw folder with mixed content"
+      ],
+      "anti_triggers": [
+        "Simple single-file tasks",
+        "Tasks where code-review-graph alone is sufficient (pure code, no docs)"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source. Uses Claude API for semantic extraction of non-code files only."
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "pip_install",
+        "command": "pip install graphifyy && graphify install",
+        "alternative": "npx skills add safishamsi/graphify"
+      },
+      "integration_notes": "The bridge between your codebase and Obsidian. Use --obsidian flag to auto-generate vaults. Complements code-review-graph: CRG handles code structure, graphify handles broader knowledge (docs, research, multimodal). Together with recall-stack L5 (Obsidian), forms the complete second brain.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "mempalace",
+      "name": "MemPalace — Verbatim AI Memory System",
+      "source": "https://github.com/milla-jovovich/mempalace",
+      "type": "github_repo",
+      "category": "memory",
+      "owner": "external",
+      "description": "Stores conversations verbatim in ChromaDB without summarisation. Palace architecture (wings/halls/rooms) for structured retrieval. 170 tokens on startup, semantic search on demand. 19 MCP tools. Runs fully offline. AAAK compression for token efficiency.",
+      "activation_triggers": [
+        "Long-running projects where every decision must be recallable",
+        "When claude-mem summaries lose critical context",
+        "Cross-project memory where decisions in project A affect project B",
+        "User says remember everything or needs verbatim recall"
+      ],
+      "anti_triggers": [
+        "Single-session tasks",
+        "Tasks where claude-mem coverage is sufficient"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, local ChromaDB, ~$10/year storage"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "pip_install",
+        "command": "pip install mempalace && mempalace install"
+      },
+      "integration_notes": "Complements claude-mem. claude-mem captures compressed observations; MemPalace stores raw verbatim conversations. Use claude-mem for quick recall, MemPalace for deep recall when exact wording matters.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "lightpanda",
+      "name": "Lightpanda — Headless Browser for AI Agents",
+      "source": "https://github.com/lightpanda-io/browser",
+      "type": "github_repo",
+      "category": "browser",
+      "owner": "external",
+      "description": "Headless browser built from scratch in Zig for AI agents. 9x faster, 16x less memory than Chrome. CDP compatible with Playwright/Puppeteer. No visual rendering — optimised for data extraction, scraping, and DOM manipulation.",
+      "activation_triggers": [
+        "Web scraping or data extraction tasks",
+        "Headless browsing where visual rendering is not needed",
+        "High-volume page fetching (speed and memory matter)",
+        "AI agent browsing workflows"
+      ],
+      "anti_triggers": [
+        "Tasks requiring screenshots or visual testing",
+        "Complex SPAs that need full Chrome rendering",
+        "Tasks requiring visual interaction — use Playwright MCP instead"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, runs locally"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "binary_download",
+        "command": "curl -L -o lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-aarch64-macos && chmod a+x ./lightpanda"
+      },
+      "integration_notes": "Use Lightpanda for data extraction tasks (scraping, crawling). Use Playwright MCP for interactive tasks (screenshots, form filling, visual testing). Commander chooses based on whether the task needs to 'see' or just 'read'.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "playwright-mcp",
+      "name": "Playwright MCP — Browser Automation with Visual Rendering",
+      "source": "https://github.com/microsoft/playwright-mcp",
+      "type": "mcp_server",
+      "category": "browser",
+      "owner": "external",
+      "description": "Official Playwright MCP server for full browser automation. Screenshots, form filling, visual testing, interaction with complex web apps. Uses Chromium for full rendering.",
+      "activation_triggers": [
+        "Tasks requiring visual browser interaction",
+        "Screenshot capture or visual testing",
+        "Form filling or UI interaction",
+        "Testing web applications visually",
+        "Tasks where Lightpanda's no-render limitation is a problem"
+      ],
+      "anti_triggers": [
+        "Pure data extraction or scraping — use Lightpanda instead (faster)",
+        "Tasks that don't need visual rendering"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "mcp_add",
+        "command": "claude mcp add playwright -- npx -y @playwright/mcp@latest"
+      },
+      "integration_notes": "Pair with Lightpanda for a complete browser strategy. Lightpanda handles speed-critical data extraction; Playwright handles visual interaction. For subagent isolation, use --isolated flag.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "nano-banana-2",
+      "name": "Nano Banana 2 — AI Image Generation CLI",
+      "source": "https://github.com/kingbootoshi/nano-banana-2-skill",
+      "type": "github_repo",
+      "category": "image-generation",
+      "owner": "external",
+      "description": "AI image generation CLI powered by Gemini. Green screen transparency, reference images, style transfer, aspect ratios. ~$0.04/image. Also a Claude Code plugin. Tracks cost per generation.",
+      "activation_triggers": [
+        "Generate images for websites, apps, or content",
+        "Create transparent assets (icons, logos, mascots)",
+        "UI design iterations — quickly generate design variations",
+        "Thumbnails, social media graphics, hero images",
+        "Style transfer or image editing",
+        "User says generate an image or create a visual"
+      ],
+      "anti_triggers": [
+        "Tasks with no visual component",
+        "When user explicitly wants a different image gen service"
+      ],
+      "cost_profile": {
+        "type": "freemium",
+        "free_tier_limits": "Gemini free tier available",
+        "paid_threshold": "~$0.04/image on paid tier",
+        "requires_approval": true
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_run",
+        "command": "git clone https://github.com/kingbootoshi/nano-banana-2-skill.git ~/tools/nano-banana-2 && cd ~/tools/nano-banana-2 && bun install && bun link",
+        "requirements": [
+          "Bun runtime",
+          "Gemini API key (free tier available at ai.google.dev)"
+        ]
+      },
+      "integration_notes": "Fills the visual asset gap. Pairs with visual-storyteller (plans the shots) and SuperDesign (UI mockups). nano-banana generates the actual images. Cost tracking built in via ~/.nano-banana/costs.json.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "ui-ux-pro-max",
+      "name": "UI/UX Pro Max — Design Intelligence Skill",
+      "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "type": "github_repo",
+      "category": "design",
+      "owner": "external",
+      "description": "Design intelligence with 50+ styles, 161 colour palettes, 57 font pairings, 161 product types, 99 UX guidelines, 25 chart types across 10 technology stacks. AI-powered Design System Generator. BM25 search engine for recommendations.",
+      "activation_triggers": [
+        "ANY frontend or UI design task",
+        "Building websites, landing pages, dashboards, apps",
+        "Choosing colour schemes, typography, layout systems",
+        "Reviewing UI code for UX, accessibility, visual consistency",
+        "User mentions design, UI, UX, landing page, dashboard"
+      ],
+      "anti_triggers": [
+        "Backend-only tasks with no UI",
+        "Pure API or data pipeline work"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, runs locally"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "plugin_install",
+        "command": "/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill && /plugin install ui-ux-pro-max@ui-ux-pro-max-skill",
+        "alternative": "npm install -g uipro-cli && uipro init --ai claude"
+      },
+      "integration_notes": "The design brain — makes design decisions (style, colours, typography). Pair with SuperDesign (generates mockups) and emilkowalski/skill (animation quality). Pipeline: ui-ux-pro-max decides → SuperDesign visualises → emilkowalski polishes.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "emil-design-eng",
+      "name": "Emil Kowalski Design Engineering Skill",
+      "source": "https://github.com/emilkowalski/skill",
+      "type": "github_repo",
+      "category": "design",
+      "owner": "external",
+      "description": "Design engineering skill covering animations, design, code, and performance. Spring physics, easing functions, gesture handling, Framer Motion/Motion best practices. Based on Emil Kowalski's articles and course.",
+      "activation_triggers": [
+        "Implementing animations or transitions in React/web",
+        "Reviewing animation quality",
+        "Hover effects, modals, carousels, page transitions",
+        "User mentions animation, motion, transition, spring, easing"
+      ],
+      "anti_triggers": [
+        "Non-frontend tasks",
+        "Static content with no interactive elements"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "npx_install",
+        "command": "npx skills add emilkowalski/skill"
+      },
+      "integration_notes": "The animation quality layer. Use case-by-case, not always-on. Activate when frontend agent is building interactive UI. Pairs with ui-ux-pro-max (design decisions) and stitch-skills (design-to-code).",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "superdesign",
+      "name": "SuperDesign — AI Design Agent + MCP Server",
+      "source": "https://github.com/superdesigndev/superdesign",
+      "type": "github_repo",
+      "category": "design",
+      "owner": "external",
+      "description": "Open-source AI design agent that generates UI mockups, wireframes, and production-ready components from natural language. Generates 10+ design variants in parallel. Runs locally, MIT licensed. MCP server available for Claude Code.",
+      "activation_triggers": [
+        "Generating UI mockups or wireframes before coding",
+        "Exploring multiple design directions quickly",
+        "User wants to see design options before committing",
+        "Prototyping new pages or components",
+        "User says show me design options or mockup"
+      ],
+      "anti_triggers": [
+        "Already have a design/mockup to implement",
+        "Backend-only work",
+        "Tasks where design exploration isn't needed"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, runs locally, MIT licensed"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "mcp_server",
+        "command": "Clone https://github.com/jonthebeef/superdesign-mcp-claude-code and configure as MCP server",
+        "alternative": "Install VS Code extension from marketplace"
+      },
+      "integration_notes": "Visual prototyping layer. Use before coding: SuperDesign generates mockup variants → user picks one → frontend agent implements it. Works best in the pipeline: ui-ux-pro-max (design system) → SuperDesign (mockups) → emilkowalski/skill (animations) → code.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "open-montage",
+      "name": "OpenMontage — Agentic Video Production System",
+      "source": "https://github.com/calesthio/OpenMontage",
+      "type": "github_repo",
+      "category": "video",
+      "owner": "external",
+      "description": "Open-source agentic video production with 11 pipelines, 49 tools, 400+ agent skills. Explainers, talking heads, screen demos, cinematic trailers, animations, podcasts, localisation. Uses Remotion for composition. Quality enforcement via contract validation.",
+      "activation_triggers": [
+        "Video production of any kind",
+        "Explainer videos, product demos, trailers",
+        "Content repurposing into video format",
+        "Podcast editing or clip extraction",
+        "User mentions video, explainer, talking head, trailer, animation"
+      ],
+      "anti_triggers": [
+        "Tasks with no video component",
+        "Simple image generation — use nano-banana-2 instead",
+        "Audio-only tasks"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source. May use paid APIs for TTS, music, or video gen models depending on pipeline."
+      },
+      "dependencies": [
+        "remotion-skills"
+      ],
+      "setup_instructions": {
+        "method": "clone_and_run",
+        "command": "git clone https://github.com/calesthio/OpenMontage.git ~/claude-hq/repos/open-montage"
+      },
+      "integration_notes": "Full video production pipeline. Pairs naturally with creator skills: killer-scripter (writes script) → visual-storyteller (plans shots) → OpenMontage (produces video). Also uses Remotion (already registered) for composition.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-11"
+    },
+    {
+      "id": "wan2gp",
+      "name": "Wan2GP — Local AI Video Generator (GPU Required)",
+      "source": "https://github.com/deepbeepmeep/Wan2GP",
+      "type": "github_repo",
+      "category": "video",
+      "owner": "external",
+      "description": "AI video generator optimised for consumer NVIDIA GPUs. Supports Wan 2.1/2.2, Hunyuan Video, LTX Video, Flux. Has internal API for agent integration. Includes Deepy agent for offline operation.",
+      "activation_triggers": [
+        "Generating AI video clips locally",
+        "Text-to-video or image-to-video generation",
+        "Only when NVIDIA GPU is available"
+      ],
+      "anti_triggers": [
+        "No NVIDIA GPU available (Mac Apple Silicon)",
+        "Tasks where stock footage or screen recording suffice",
+        "Simple editing tasks — use OpenMontage instead"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, runs locally. Requires NVIDIA GPU with sufficient VRAM."
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "clone_and_run",
+        "command": "git clone https://github.com/deepbeepmeep/Wan2GP.git && conda create -n wan2gp python=3.10.9",
+        "requirements": [
+          "NVIDIA GPU",
+          "CUDA",
+          "conda"
+        ]
+      },
+      "integration_notes": "Backend video gen engine for OpenMontage when AI-generated clips are needed. CONDITIONAL — only register and activate if NVIDIA GPU hardware is confirmed available.",
+      "priority": "LOW",
+      "status": "conditional",
+      "added_date": "2026-04-11"
     }
   ],
   "skills": [
@@ -611,9 +1049,22 @@
       "id": "prd-full-build",
       "name": "PRD Full Build Stack",
       "description": "TRIGGERED AUTOMATICALLY when user provides a PRD. Complete toolchain for production application builds.",
-      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["PRD provided", "Product requirements document", "Here is my PRD", "Build from this PRD"],
+      "tools": [
+        "autonomous-agent-system",
+        "token-efficiency-repo",
+        "claude-mem",
+        "recall-stack",
+        "everything-claude-code"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "PRD provided",
+        "Product requirements document",
+        "Here is my PRD",
+        "Build from this PRD"
+      ],
       "activation_order": [
         "1. Apply TECCP skill (session management)",
         "2. Activate recall-stack (crash-safe session state + git context + behavioral learning)",
@@ -630,9 +1081,20 @@
       "id": "full-project-build",
       "name": "Full Project Build Stack",
       "description": "For building complete applications without a formal PRD.",
-      "tools": ["autonomous-agent-system", "token-efficiency-repo", "claude-mem", "recall-stack"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["Build me a", "Create a complete", "Build from scratch"],
+      "tools": [
+        "autonomous-agent-system",
+        "token-efficiency-repo",
+        "claude-mem",
+        "recall-stack"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Build me a",
+        "Create a complete",
+        "Build from scratch"
+      ],
       "activation_order": [
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + git context)",
@@ -647,9 +1109,25 @@
       "id": "seed-to-paul-pipeline",
       "name": "SEED → PAUL Ideation-to-Build Pipeline",
       "description": "Complete idea-to-build pipeline. SEED guides ideation and produces a structured PLANNING.md, then PAUL picks it up for managed build execution. Use when starting a new project from an idea.",
-      "tools": ["seed", "paul-framework", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["I have an idea", "New project from scratch", "Plan and build", "Seed this", "Let me think this through then build", "Ideate and build"],
+      "tools": [
+        "seed",
+        "paul-framework",
+        "token-efficiency-repo",
+        "claude-mem",
+        "recall-stack",
+        "everything-claude-code"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "I have an idea",
+        "New project from scratch",
+        "Plan and build",
+        "Seed this",
+        "Let me think this through then build",
+        "Ideate and build"
+      ],
       "activation_order": [
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning)",
@@ -665,9 +1143,22 @@
       "id": "structured-quality-build",
       "name": "Structured Quality Build Stack",
       "description": "When quality and closure matter more than speed. Uses PAUL for loop integrity. Consider running SEED first if requirements aren't fully defined.",
-      "tools": ["paul-framework", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["Need acceptance criteria", "Structured development", "Quality over speed", "Plan-apply-unify"],
+      "tools": [
+        "paul-framework",
+        "token-efficiency-repo",
+        "claude-mem",
+        "recall-stack",
+        "everything-claude-code"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Need acceptance criteria",
+        "Structured development",
+        "Quality over speed",
+        "Plan-apply-unify"
+      ],
       "activation_order": [
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning)",
@@ -684,9 +1175,22 @@
       "id": "enterprise-swarm-build",
       "name": "Enterprise Swarm Build Stack",
       "description": "For enterprise-scale projects requiring coordinated multi-agent swarms.",
-      "tools": ["ruflo", "token-efficiency-repo", "claude-mem", "recall-stack", "everything-claude-code"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["Enterprise project", "Multi-agent swarm", "Large-scale orchestration", "60+ agents"],
+      "tools": [
+        "ruflo",
+        "token-efficiency-repo",
+        "claude-mem",
+        "recall-stack",
+        "everything-claude-code"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Enterprise project",
+        "Multi-agent swarm",
+        "Large-scale orchestration",
+        "60+ agents"
+      ],
       "activation_order": [
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning across swarm sessions)",
@@ -702,9 +1206,35 @@
       "id": "creator-content-pipeline",
       "name": "Creator Content Pipeline Stack",
       "description": "Full content creation workflow from audience research to performance measurement. Activates relevant creator skills based on where the user is in the pipeline. Humanizer runs as a post-processing filter on all public-facing text.",
-      "tools": ["claude-creator-skills", "humanizer"],
-      "skills": ["creator-audience-research", "creator-brand-voice", "creator-content-ideation", "creator-killer-scripter", "creator-visual-storyteller", "creator-content-repurposer", "creator-offer-bio-writer", "creator-performance-debriefer", "humanizer-skill"],
-      "trigger_patterns": ["Write content", "Content strategy", "Write a script", "Repurpose this", "What should I post", "Analyze my performance", "Write my bio", "Brand voice", "Content ideas", "Humanize this", "Make it sound human", "Remove AI patterns"],
+      "tools": [
+        "claude-creator-skills",
+        "humanizer"
+      ],
+      "skills": [
+        "creator-audience-research",
+        "creator-brand-voice",
+        "creator-content-ideation",
+        "creator-killer-scripter",
+        "creator-visual-storyteller",
+        "creator-content-repurposer",
+        "creator-offer-bio-writer",
+        "creator-performance-debriefer",
+        "humanizer-skill"
+      ],
+      "trigger_patterns": [
+        "Write content",
+        "Content strategy",
+        "Write a script",
+        "Repurpose this",
+        "What should I post",
+        "Analyze my performance",
+        "Write my bio",
+        "Brand voice",
+        "Content ideas",
+        "Humanize this",
+        "Make it sound human",
+        "Remove AI patterns"
+      ],
       "activation_order": [
         "1. Identify where user is in the creator pipeline",
         "2. Load brand-voice-guardian if voice card exists (persistent filter)",
@@ -718,11 +1248,172 @@
     {
       "id": "quick-enhancement",
       "name": "Quick Enhancement Stack",
-      "tools": ["token-efficiency-repo"],
-      "skills": ["token-efficiency-skill"],
-      "trigger_patterns": ["Fix this", "Add feature", "Modify", "Quick change"],
-      "activation_order": ["1. Apply TECCP if needed", "2. Direct implementation"],
+      "tools": [
+        "token-efficiency-repo"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Fix this",
+        "Add feature",
+        "Modify",
+        "Quick change"
+      ],
+      "activation_order": [
+        "1. Apply TECCP if needed",
+        "2. Direct implementation"
+      ],
       "expected_duration": "5-30 minutes"
+    },
+    {
+      "id": "web-design-stack",
+      "name": "Web Design Stack",
+      "description": "Complete web design pipeline from design system to polished, animated frontend.",
+      "tools": [
+        "ui-ux-pro-max",
+        "superdesign",
+        "emil-design-eng",
+        "stitch-skills",
+        "nano-banana-2",
+        "code-review-graph",
+        "token-efficiency-repo"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Design a website",
+        "Build a landing page",
+        "Create a dashboard",
+        "UI design",
+        "Web design",
+        "Frontend design"
+      ],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Activate code-review-graph (if existing codebase)",
+        "3. Run ui-ux-pro-max --design-system (generate design system)",
+        "4. Run SuperDesign to generate mockup variants",
+        "5. User selects preferred mockup",
+        "6. Load emilkowalski/skill for animation quality",
+        "7. Load stitch-skills for design-to-code workflow",
+        "8. Use nano-banana-2 for hero images, icons, assets",
+        "9. Implement with chosen stack (React/Next.js/HTML+Tailwind)",
+        "10. Run ui-ux-pro-max pre-delivery checklist"
+      ],
+      "expected_duration": "60-240 minutes"
+    },
+    {
+      "id": "video-production-stack",
+      "name": "Video Production Stack",
+      "description": "Full video production from script to finished video.",
+      "tools": [
+        "claude-creator-skills",
+        "open-montage",
+        "remotion-skills",
+        "nano-banana-2",
+        "humanizer"
+      ],
+      "skills": [
+        "creator-killer-scripter",
+        "creator-visual-storyteller",
+        "humanizer-skill"
+      ],
+      "trigger_patterns": [
+        "Create a video",
+        "Make an explainer",
+        "Video production",
+        "Talking head video",
+        "Product demo video"
+      ],
+      "activation_order": [
+        "1. Load killer-scripter (write the script)",
+        "2. Run humanizer on script (if narration will be public)",
+        "3. Load visual-storyteller (plan shots)",
+        "4. Activate OpenMontage (select pipeline, configure tools)",
+        "5. Use nano-banana-2 for AI-generated scenes/graphics",
+        "6. OpenMontage orchestrates production pipeline",
+        "7. Remotion handles final composition"
+      ],
+      "expected_duration": "120-480 minutes"
+    },
+    {
+      "id": "research-analysis-stack",
+      "name": "Research & Analysis Stack",
+      "description": "Deep research with knowledge graph output and Obsidian integration.",
+      "tools": [
+        "graphify",
+        "lightpanda",
+        "token-efficiency-repo",
+        "recall-stack",
+        "claude-mem"
+      ],
+      "skills": [
+        "token-efficiency-skill"
+      ],
+      "trigger_patterns": [
+        "Research this",
+        "Analyze this topic",
+        "Deep dive into",
+        "Survey the landscape",
+        "Competitive analysis"
+      ],
+      "activation_order": [
+        "1. Apply TECCP skill",
+        "2. Use Lightpanda for web scraping/data collection",
+        "3. Run graphify on collected materials (--obsidian for vault export)",
+        "4. Query the knowledge graph for insights",
+        "5. Store findings in recall-stack and claude-mem",
+        "6. Deliver structured report"
+      ],
+      "expected_duration": "30-120 minutes"
+    },
+    {
+      "id": "full-creative-brief-stack",
+      "name": "Full Creative Brief Stack",
+      "description": "Complete creative campaign from audience research through video production and performance measurement.",
+      "tools": [
+        "claude-creator-skills",
+        "humanizer",
+        "open-montage",
+        "nano-banana-2",
+        "graphify",
+        "lightpanda"
+      ],
+      "skills": [
+        "creator-audience-research",
+        "creator-brand-voice",
+        "creator-content-ideation",
+        "creator-killer-scripter",
+        "creator-visual-storyteller",
+        "creator-content-repurposer",
+        "creator-offer-bio-writer",
+        "creator-performance-debriefer",
+        "humanizer-skill"
+      ],
+      "trigger_patterns": [
+        "Full creative brief",
+        "Campaign from start to finish",
+        "Complete content strategy",
+        "Brand campaign",
+        "Launch campaign"
+      ],
+      "activation_order": [
+        "1. Load audience-research-analyst (mine audience data)",
+        "2. Load brand-voice-guardian (extract/protect voice)",
+        "3. Use Lightpanda + graphify for competitive research",
+        "4. Load content-ideation (generate 15-25 strategic ideas)",
+        "5. Load killer-scripter (write scripts for selected ideas)",
+        "6. Load visual-storyteller (plan visual direction)",
+        "7. Use nano-banana-2 for AI-generated visuals",
+        "8. Activate OpenMontage for video content",
+        "9. Load content-repurposer (one piece → 10-15 platform pieces)",
+        "10. Load offer-and-bio-writer (conversion copy)",
+        "11. Run humanizer on ALL public-facing text",
+        "12. Schedule performance-debriefer for post-launch analysis"
+      ],
+      "expected_duration": "Multi-session, 2-5 days"
     }
   ],
   "external_tools": []

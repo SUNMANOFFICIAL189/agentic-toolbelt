@@ -1,0 +1,4 @@
+https://github.com/lightpanda-io/browser.git
+# Headless browser in Zig for AI agents. 9x faster, 16x less memory than Chrome.
+# CDP compatible. No visual rendering — data extraction only.
+# Skill: https://github.com/lightpanda-io/agent-skill

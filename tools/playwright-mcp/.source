@@ -1,0 +1,4 @@
+https://github.com/microsoft/playwright-mcp.git
+# Playwright MCP server for browser automation with visual rendering.
+# Use for interactive testing, screenshots, form filling.
+# Use Lightpanda instead for pure data extraction (faster).

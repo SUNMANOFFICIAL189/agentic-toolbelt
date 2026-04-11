@@ -1,0 +1,4 @@
+https://github.com/safishamsi/graphify.git
+# Multimodal knowledge graph builder. Code, docs, PDFs, images to queryable graph.
+# 71.5x token savings. Native Obsidian export (--obsidian flag).
+# Install: pip install graphifyy && graphify install

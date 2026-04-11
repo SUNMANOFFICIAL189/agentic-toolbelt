@@ -1,0 +1,4 @@
+https://github.com/tirth8205/code-review-graph.git
+# Local knowledge graph for Claude Code. Tree-sitter parsing, SQLite-backed.
+# 6.8x fewer tokens on reviews, up to 49x on daily coding. 19 languages.
+# Install: pip install code-review-graph && code-review-graph install
