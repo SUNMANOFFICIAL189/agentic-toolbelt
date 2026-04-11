@@ -1,230 +1,242 @@
-# CLAUDE HQ — Master Operating Protocol for Claude Code
+# CLAUDE HQ — JARVIS Operating Protocol for Claude Code
 
-## CRITICAL: How This System Works in Claude Code
+## CRITICAL: The Commander
 
-You are running inside Claude Code with terminal access. You do NOT "fetch URLs" — you execute bash commands. When this file says to activate a tool, that means **run the setup command in the terminal**.
+You are running the JARVIS system. Your first action on ANY non-trivial task is to load the Commander:
+
+```
+cat ~/claude-hq/commander/COMMANDER.md
+```
+
+The Commander is your orchestration brain. It tells you HOW to decompose tasks, WHICH tools to select, WHEN to spawn subagents, and HOW to enforce quality and cost control. Read it before doing anything complex.
 
 ### On Session Start — DO THIS AUTOMATICALLY:
 
-1. Read `registry.json` from THIS directory (it's a local file — `cat registry.json`)
-2. Analyze the user's first message to classify the task
-3. Based on classification, **clone and install the relevant tools WITHOUT being asked**
-4. Tell the user what you activated and why
+1. Read `commander/LESSONS.md` (mistakes to avoid)
+2. Read `registry.json` from THIS directory (`cat registry.json`)
+3. Analyze the user's first message to classify the task
+4. If non-trivial: load `commander/COMMANDER.md` and follow its activation protocol
+5. If simple: handle directly, no Commander overhead needed
 
-### The Core Principle:
+### Quick Reference — Commander Files
 
-**YOU take the initiative.** Do NOT wait for the user to paste GitHub links. YOU read the registry, YOU decide which tools match, YOU run `git clone` and install commands, YOU report what you did. The user should never need to manually direct you to a repo that's already in the registry.
+| File | Read When |
+|------|-----------|
+| `commander/COMMANDER.md` | Any non-trivial task (main orchestration logic) |
+| `commander/BORIS_PRINCIPLES.md` | Any coding or building task (engineering philosophy) |
+| `commander/COST_CONTROL.md` | Anything involving APIs, services, or model routing |
+| `commander/CREDENTIALS.md` | Anything involving API keys or sensitive data |
+| `commander/MISSION_BOARD_TEMPLATE.md` | Starting any multi-step project |
+| `commander/LESSONS.md` | EVERY session start (past mistakes to avoid) |
+| `commander/PLANNING.md` | Understanding the full system architecture |
+
+---
+
+## How This System Works in Claude Code
+
+You have terminal access. You do NOT "fetch URLs" — you execute bash commands. When this file says to activate a tool, that means **run the setup command in the terminal**.
+
+### The Core Principles:
+
+1. **Commander First** — For any non-trivial task, load COMMANDER.md and follow its 7-step protocol
+2. **YOU take the initiative** — Read the registry, decide which tools match, install them, report what you did
+3. **Zero Cost First** — Always find free alternatives before suggesting paid options (see COST_CONTROL.md)
+4. **Plan Before Execute** — Write a mission board before spawning agents (see MISSION_BOARD_TEMPLATE.md)
+5. **Staff Engineer Bar** — "Would a staff engineer approve this?" is the quality gate
+6. **Never Expose Credentials** — Follow CREDENTIALS.md for all API key handling
+7. **Learn From Mistakes** — After any correction, update LESSONS.md
 
 ---
 
 ## Tool Activation — Actual Commands to Run
 
-When activating a tool, run its setup command in the terminal. Here's exactly what to do:
+When activating a tool, run its setup command in the terminal:
 
 ### For GitHub repos (clone into ~/claude-hq/repos/):
 ```bash
 git clone [source_url] ~/claude-hq/repos/[tool-id]
 ```
-Then read the repo's README.md or key instruction file to understand how to use it.
 
 ### For npm packages:
 ```bash
 npm install -g [package-name]
 ```
 
+### For pip packages:
+```bash
+pip install [package-name]
+```
+
 ### For Claude Code plugins:
 ```bash
-# These run as Claude Code slash commands, not bash:
 /plugin marketplace add [owner/repo]
 /plugin install [plugin-name]
 ```
 
+### For MCP servers:
+```bash
+claude mcp add [name] -- [command]
+```
+
 ### For skill files (.md or .skill):
-Read the SKILL.md or `.skill` file content and internalize the rules as your operating behavior for this session. For creator skills: `cat ~/claude-hq/tools/claude-creator-skills/[name].skill`
+Read the file content and internalize as operating behavior for this session.
 
 ---
 
 ## Task Classification → Auto-Activation Map
 
-When the user gives you a task, classify it and activate tools IMMEDIATELY:
+The Commander handles complex classification via its full protocol. For quick reference:
 
-| User Intent | What You Do (no asking, just do it) |
-|-------------|--------------------------------------|
-| Provides a PRD | Clone autonomous-agent-system + everything-claude-code. Install claude-mem plugin. Read TECCP skill. Report activation. |
-| "Build me X" | Clone autonomous-agent-system. Read TECCP skill. Report activation. |
-| Multi-session project | Read TECCP skill. Install claude-mem plugin. Install recall-stack (session state + behavioral learning). Report activation. |
-| Wants TDD / code review / security | Clone everything-claude-code repo. Run `./install.sh typescript`. Report. |
-| New idea / project from scratch / needs planning | Install SEED (`npm i -g @chrisai/seed`). Run `/seed` for guided ideation → PLANNING.md. Then `/seed launch` to graduate into PAUL. Report. |
-| Structured planning needed (requirements already clear) | Install paul-framework (`npx paul-framework`). Report. |
-| Enterprise/multi-agent scale | Install ruflo (`npm install -g claude-flow`). Report. |
-| Prediction markets / Polymarket | Clone polymarket-cli. Run `cargo install --path .` or use brew. Report. |
-| Wants to create new skills | Clone skill-factory. Read its CLAUDE.md for instructions. Report. |
-| Needs curated skills library | Clone the relevant skills repo (superpowers, awesome-skills, etc). Browse available skills. Report. |
-| Session memory / pick up where left off / behavioral learning | Clone recall-stack. Run `bash setup.sh`. Pairs with claude-mem for full memory coverage. Report. |
-| Content creation / scripts / reels / brand / strategy | Read relevant .skill file(s) from `~/claude-hq/tools/claude-creator-skills/`. Match intent to skill. Load brand-voice-guardian as persistent filter. Load humanizer as post-processing filter. Report. |
-| Humanize AI text / make copy sound human / marketing copy | Read `~/claude-hq/tools/humanizer/SKILL.md`. Apply 25-pattern detection + two-pass audit. Report. |
-| Niche/specialized skill needed (pentest, SEO, game dev, etc.) | Search `~/claude-hq/tools/agent-skills-mega/skills_index.json` for matching skill. Read from `~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/`. Report. |
-| Needs specialized subagents (language experts, domain agents) | Browse `~/claude-hq/repos/awesome-claude-code-subagents/categories/`. Find matching agent definition. Report. |
-| Programmatic video / Remotion / video-as-code | Read `~/claude-hq/repos/remotion-skills/skills/remotion/`. Report. |
-| Design-to-code / React component generation / design systems | Read `~/claude-hq/repos/stitch-skills/skills/`. Report. |
-| Quick fix / simple task | Just do it. No tool activation needed. |
+| User Intent | Primary Action |
+|-------------|---------------|
+| **"activate HQ"** | Load Commander, read full registry, present capabilities |
+| **PRD provided** | Commander → PRD Full Build Stack |
+| **"Build me X"** | Commander → Full Project Build Stack |
+| **New idea / needs planning** | SEED → PAUL Pipeline |
+| **Web design / landing page / UI** | Commander → Web Design Stack (ui-ux-pro-max → SuperDesign → emilkowalski → stitch) |
+| **Video production** | Commander → Video Production Stack (scripter → visual → OpenMontage) |
+| **Creative brief / campaign** | Commander → Full Creative Brief Stack (8 creator skills → humanizer) |
+| **Research / analysis** | Commander → Research Stack (graphify → Lightpanda → Obsidian) |
+| **Content creation** | Creator skills pipeline → humanizer |
+| **Code review / TDD** | everything-claude-code + code-review-graph |
+| **Multi-session project** | TECCP + claude-mem + recall-stack |
+| **Enterprise swarm** | ruflo |
+| **Quick fix / simple task** | Just do it. No Commander needed. |
 
 ---
 
-## Registered Tools (19)
+## Registered Tools (25)
 
-### Owned by User (SUNMANOFFICIAL189)
-| ID | Source | Setup Command |
-|----|--------|---------------|
-| `autonomous-agent-system` | github.com/SUNMANOFFICIAL189/autonomous-agent-system | `git clone https://github.com/SUNMANOFFICIAL189/autonomous-agent-system.git ~/claude-hq/repos/autonomous-agent-system` |
-| `token-efficiency-repo` | github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity | `git clone https://github.com/SUNMANOFFICIAL189/token-efficiency-context-continuity.git ~/claude-hq/repos/token-efficiency` then read `SKILL.md` |
-| `claude-creator-skills` | local://tools/claude-creator-skills/ (8 .skill files) | `cat ~/claude-hq/tools/claude-creator-skills/[skill-name].skill` — read and internalize |
-| `agent-skills-mega` | local://tools/agent-skills-mega/ (256 skills) | Search `~/claude-hq/tools/agent-skills-mega/skills_index.json`, then read from `~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/` |
+### Foundational (ALWAYS active for coding)
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `token-efficiency-repo` | Session-level token discipline | Read SKILL.md |
+| `code-review-graph` | Codebase-level token savings (6.8-49x) | `pip install code-review-graph && code-review-graph install` |
+| `recall-stack` | 5-layer crash-safe memory | `git clone → bash setup.sh` |
 
-### External Tools
-| ID | Source | Setup Command |
-|----|--------|---------------|
-| `claude-mem` | github.com/thedotmack/claude-mem | `/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem` |
-| `ruflo` | github.com/ruvnet/ruflo | `npm install -g claude-flow` |
-| `everything-claude-code` | github.com/affaan-m/everything-claude-code | `git clone https://github.com/affaan-m/everything-claude-code.git ~/claude-hq/repos/everything-claude-code && cd ~/claude-hq/repos/everything-claude-code && ./install.sh typescript` |
-| `paul-framework` | github.com/ChristopherKahler/paul | `npx paul-framework` |
-| `seed` | github.com/ChristopherKahler/seed | `npm i -g @chrisai/seed` then `/seed` in Claude Code |
-| `polymarket-cli` | github.com/Polymarket/polymarket-cli | `git clone https://github.com/Polymarket/polymarket-cli.git ~/claude-hq/repos/polymarket-cli` |
-| `skill-factory` | github.com/alirezarezvani/claude-code-skill-factory | `git clone https://github.com/alirezarezvani/claude-code-skill-factory.git ~/claude-hq/repos/skill-factory` |
-| `awesome-skills-antigravity` | github.com/sickn33/antigravity-awesome-skills | `git clone https://github.com/sickn33/antigravity-awesome-skills.git ~/claude-hq/repos/awesome-skills-antigravity` |
-| `awesome-claude-skills` | github.com/ComposioHQ/awesome-claude-skills | `git clone https://github.com/ComposioHQ/awesome-claude-skills.git ~/claude-hq/repos/awesome-claude-skills` |
-| `superpowers` | github.com/obra/superpowers | `git clone https://github.com/obra/superpowers.git ~/claude-hq/repos/superpowers` |
-| `recall-stack` | github.com/keshavsuki/recall-stack | `git clone https://github.com/keshavsuki/recall-stack.git ~/claude-hq/repos/recall-stack && cd ~/claude-hq/repos/recall-stack && bash setup.sh` |
-| `awesome-claude-code-subagents` | github.com/VoltAgent/awesome-claude-code-subagents | `git clone https://github.com/VoltAgent/awesome-claude-code-subagents.git ~/claude-hq/repos/awesome-claude-code-subagents` |
-| `remotion-skills` | github.com/remotion-dev/skills | `git clone https://github.com/remotion-dev/skills.git ~/claude-hq/repos/remotion-skills` |
-| `stitch-skills` | github.com/google-labs-code/stitch-skills | `git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills` |
-| `humanizer` | github.com/blader/humanizer | `cat ~/claude-hq/tools/humanizer/SKILL.md` — read and internalize |
+### Knowledge & Memory
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `claude-mem` | Persistent cross-session observations | `/plugin install claude-mem` |
+| `mempalace` | Verbatim conversation storage, 19 MCP tools | `pip install mempalace && mempalace install` |
+| `graphify` | Multimodal knowledge graph → Obsidian (71.5x token savings) | `pip install graphifyy && graphify install` |
+
+### Orchestration
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `autonomous-agent-system` | Micro-task decomposition | `git clone` |
+| `ruflo` | Multi-agent swarms, 60+ agents | `npm install -g claude-flow` |
+| `everything-claude-code` | 21 agents, 102 skills, quality gates | `git clone → ./install.sh` |
+
+### Workflow
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `seed` | Ideation → PLANNING.md | `npm i -g @chrisai/seed` |
+| `paul-framework` | Plan-Apply-Unify loop | `npx paul-framework` |
+
+### Browser
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `lightpanda` | Headless browser for data extraction (9x faster) | Binary download |
+| `playwright-mcp` | Full browser automation with visual rendering | `claude mcp add playwright` |
+
+### Design
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `ui-ux-pro-max` | Design intelligence, 161 palettes, 50+ styles | Plugin install |
+| `emil-design-eng` | Animation and interaction design | `npx skills add emilkowalski/skill` |
+| `superdesign` | AI design agent, 10+ mockup variants | MCP server |
+| `stitch-skills` | Google design-to-code workflow | `git clone` |
+
+### Image & Video
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `nano-banana-2` | AI image gen via Gemini (~$0.04/img) | `git clone → bun install → bun link` |
+| `open-montage` | Full video production, 11 pipelines | `git clone` |
+| `remotion-skills` | Programmatic video with React | `git clone` |
+| `wan2gp` | Local AI video gen (NVIDIA GPU required) | Conditional |
+
+### Content
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `claude-creator-skills` | 8-skill content pipeline | Read .skill files |
+| `humanizer` | AI text humanisation (25 patterns) | Read SKILL.md |
+
+### Agent Libraries
+| ID | Purpose | Setup |
+|----|---------|-------|
+| `awesome-claude-code-subagents` | 138 specialist agents | `git clone` |
+| `agent-skills-mega` | 256 skills across all domains | Search skills_index.json |
 
 ---
 
-## Tool Decision Guide
+## Tool Combinations (11 Predefined Stacks)
 
-| Situation | Primary Tool | Also Activate |
-|-----------|-------------|---------------|
-| Build a complete app fast | autonomous-agent-system | token-efficiency, claude-mem, recall-stack |
-| PRD provided | autonomous-agent-system | token-efficiency, claude-mem, recall-stack, everything-claude-code |
-| New idea → plan → build (full pipeline) | seed → paul-framework | token-efficiency, claude-mem, recall-stack |
-| Quality gates + acceptance criteria | paul-framework | token-efficiency, claude-mem, recall-stack, (seed first if requirements unclear) |
-| Enterprise multi-agent swarm | ruflo | token-efficiency, claude-mem, recall-stack |
-| TDD, code review, security | everything-claude-code | — |
-| Token efficiency / session handoff | token-efficiency-repo | — |
-| Persistent cross-session memory | claude-mem | token-efficiency, recall-stack |
-| Session state + behavioral learning | recall-stack | token-efficiency, claude-mem |
-| Creating new Claude Code skills | skill-factory | — |
-| Browsing curated skill libraries | superpowers OR awesome-skills | — |
-| Prediction markets / Polymarket | polymarket-cli | — |
-| Campaign / marketing launch planning | seed (campaign type) | claude-creator-skills, humanizer |
-| Content creation (scripts, reels, carousels) | claude-creator-skills | brand-voice-guardian (persistent), humanizer (post-processing) |
-| Humanize AI text / marketing copy / campaigns | humanizer | brand-voice-guardian (if voice card exists) |
-| Audience research / content strategy | claude-creator-skills | — |
-| Repurpose / maximize content | claude-creator-skills | — |
-| Niche skill (pentest, SEO, game dev, etc.) | agent-skills-mega | — |
-| Specialized subagents / language experts | awesome-claude-code-subagents | — |
-| Programmatic video / Remotion | remotion-skills | — |
-| Design-to-code / React from design specs | stitch-skills | — |
+The Commander selects the right stack based on task classification. See `registry.json` → `tool_combinations` for full activation orders.
+
+| Stack | Triggers |
+|-------|----------|
+| PRD Full Build | PRD provided, product requirements |
+| Full Project Build | "Build me X", app from scratch |
+| SEED → PAUL Pipeline | New idea, plan and build |
+| Structured Quality Build | Acceptance criteria, quality over speed |
+| Enterprise Swarm Build | 60+ agents, large-scale orchestration |
+| Creator Content Pipeline | Content strategy, scripts, brand |
+| Quick Enhancement | Fix this, add feature, quick change |
+| **Web Design** | Landing page, dashboard, UI design |
+| **Video Production** | Explainer, talking head, trailer |
+| **Research & Analysis** | Research, analyze, competitive analysis |
+| **Full Creative Brief** | Complete campaign, brand launch |
 
 ---
 
 ## SEED → PAUL — Ideation-to-Build Pipeline
 
-SEED (by Chris Kahler, same author as PAUL) is the ideation phase that precedes building. **Always consider SEED when a user starts a new project from an idea.**
-
 ```
 Raw idea → /seed → Guided ideation → PLANNING.md → /seed launch → PAUL managed build
 ```
 
-| Command | What It Does |
-|---------|-------------|
-| `/seed` | Start guided ideation — select project type, explore collaboratively, produce PLANNING.md |
-| `/seed graduate` | Move completed plan to `apps/{name}/` with git init + README |
-| `/seed launch` | Graduate + headless PAUL init — zero-friction handoff |
-| `/seed status` | Show all projects in ideation pipeline |
-| `/seed add-type` | Create a custom project type |
-
-**5 Project Types** (each shapes the conversation differently):
-- **Application** (deep rigor) — Software with UI, data model, API, deployment
-- **Workflow** (standard) — Claude Code commands, hooks, skills
-- **Client** (standard) — Client websites, conversion, content
-- **Utility** (tight) — Small tools, scripts, resists scope creep
-- **Campaign** (creative) — Content, marketing, launches — timeline-driven
-
-**Key rule:** SEED produces a PLANNING.md rich enough that PAUL derives its entire structure without re-asking questions. `/seed launch` wraps graduation + headless PAUL init in one command.
-
-**Campaign type + Creator Skills:** For campaign-type projects, SEED's ideation naturally feeds into the creator content pipeline (audience research → scripts → visual → repurpose → humanize).
+5 project types: Application (deep), Workflow (standard), Client (standard), Utility (tight), Campaign (creative).
 
 ---
 
 ## Creator Skills — 8-Skill Content Pipeline
 
-First-party skill collection stored at `~/claude-hq/tools/claude-creator-skills/`. Each `.skill` file is self-contained. Load by reading the file and internalizing it.
+Stored at `~/claude-hq/tools/claude-creator-skills/`. Pipeline order:
 
-| Skill File | What It Does | When to Load |
-|-----------|-------------|--------------|
-| `audience-research-analyst.skill` | Mines comments/DMs/forums for real pain points and content ideas | "what does my audience want", analyze comments, audience research |
-| `brand-voice-guardian.skill` | Extracts and protects authentic creator voice via Voice Card | "does this sound like me", voice consistency, brand voice |
-| `content-ideation.skill` | Generates 15-25 strategic content ideas across formats | "I'm out of ideas", "what should I post", content calendar |
-| `killer-scripter.skill` | Writes Reel/YouTube/carousel scripts with 50 hook templates | "write a script", "write a reel", video/carousel content |
-| `visual-storyteller.skill` | Shot-by-shot plans, art direction, AI image/video prompts | "plan the shots", "make this visual", visual direction |
-| `content-repurposer.skill` | Turns 1 long-form piece into 10-15 platform-native pieces | "repurpose this", "turn this into reels", maximize content |
-| `offer-and-bio-writer.skill` | Bios, landing pages, DM scripts that convert | "write my bio", "landing page copy", offer/DM scripts |
-| `content-performance-debriefer.skill` | Weekly debriefs from analytics — what worked and why | "analyze my performance", "what worked this week" |
+Research → Voice → Ideation → Script → Visual → Repurpose → Offer → Debrief → **Humanize**
 
-**Pipeline order:** Research → Voice → Ideation → Script → Visual → Repurpose → Offer → Debrief → **Humanize**
-
-**Key rules:**
-- Always load `brand-voice-guardian` as a persistent filter when any other creator skill is active.
-- Always run `humanizer` as a post-processing pass on any public-facing text output (marketing copy, social posts, campaigns, landing pages, emails). Read `~/claude-hq/tools/humanizer/SKILL.md` — 25-pattern AI detection + two-pass audit (draft → "what still looks AI?" → final revision).
-
----
-
-## Skill & Agent Libraries — When to Browse
-
-Seven collections are available. Search order for finding a skill:
-
-1. **agent-skills-mega** (256 skills, LOCAL) — Broadest coverage. Search `skills_index.json` first. Covers AI/ML, security, marketing, web dev, infra, game dev, and more.
-2. **awesome-claude-code-subagents** (138 agents) — When you need a specialized agent role. 10 categories from core dev to research.
-3. **superpowers** (14 skills) — Cross-platform plugin (Claude Code, Cursor, Codex, OpenCode) with agents, commands, skills, hooks.
-4. **awesome-skills-antigravity** — Curated skill collection for Antigravity/Claude Code workflows.
-5. **awesome-claude-skills** (30+ skills) — Community-maintained directory by ComposioHQ.
-6. **remotion-skills** (1 skill) — Official Remotion programmatic video skill.
-7. **stitch-skills** (3 skills) — Google Labs design-to-code: design-md, react-components, stitch-loop.
-
-**How to use:** For local collections (agent-skills-mega), search the index file. For external repos, browse the skills directory. Read the matching skill and internalize it.
+**Rules:** Always load brand-voice-guardian as persistent filter. Always run humanizer on public-facing text.
 
 ---
 
 ## Evolution Protocol
 
-This system gets stronger with every project. During any session:
+This system gets stronger with every project:
 
-1. If you identify a useful new repo/tool → propose adding it to registry.json
-2. If trigger matching could be improved → propose the update
-3. If a new tool combination works well → propose adding it
-4. Push improvements with: `cd ~/claude-hq && git add -A && git commit -m "[HQ-EVOLVE] description" && git push`
+1. Identify useful new repo/tool → propose adding to registry.json
+2. After any correction → update `commander/LESSONS.md`
+3. Push improvements: `cd ~/claude-hq && git add -A && git commit -m "[HQ-EVOLVE] description" && git push`
 
 ---
 
-## Toolbelt Commands (User Can Say These)
+## Toolbelt Commands
 
 | Command | What You Do |
 |---------|-------------|
-| "toolbelt status" | Read registry.json, list all tools and which are cloned in repos/ |
-| "toolbelt add [url]" | Clone repo, examine it, add entry to registry.json, commit |
-| "toolbelt activate [id]" | Run the setup command for that tool |
-| "toolbelt scan" | Analyze current task, recommend tools from registry |
-| "activate HQ" | Read registry, present full tool inventory |
+| "toolbelt status" | List all tools and active status |
+| "toolbelt add [url]" | Clone, examine, add to registry.json, commit |
+| "toolbelt activate [id]" | Run setup command for that tool |
+| "toolbelt scan" | Analyze task, recommend tools from registry |
+| "activate HQ" | Load Commander, present full capabilities |
 
 ---
 
 ## Response Protocol
 
-1. **Take initiative** — don't wait to be told which repo to use
-2. **Run commands** — clone, install, read files directly via terminal
-3. **Report concisely** — "🏢 HQ: Activated [tool] — [one line reason]"
-4. **Token efficiency** — follow TECCP when loaded
-5. **Evolve** — push improvements when identified
+1. **Commander first** — load COMMANDER.md for non-trivial tasks
+2. **Take initiative** — don't wait to be told which tool to use
+3. **Run commands** — clone, install, read files directly via terminal
+4. **Report concisely** — "🏢 HQ: Activated [tool] — [one line reason]"
+5. **Cost first** — always check COST_CONTROL.md before suggesting paid options
+6. **Evolve** — push improvements when identified
