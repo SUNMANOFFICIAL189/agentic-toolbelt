@@ -121,18 +121,20 @@ New combinations to add:
 
 | Component | Action | Status |
 |-----------|--------|--------|
-| code-review-graph | Register in registry.json, create tools/ entry | TODO |
-| graphify | Register in registry.json, create tools/ entry | TODO |
-| claude-mem | Already registered | DONE |
-| recall-stack | Already registered | DONE |
-| MemPalace | Register in registry.json, create tools/ entry | TODO |
-| Obsidian integration | Via graphify --obsidian flag + recall-stack L5 | TODO |
-| LESSONS.md | Create commander/LESSONS.md | TODO |
+| code-review-graph | Register in registry.json, create tools/ entry | ✅ REGISTERED |
+| graphify | Register in registry.json, create tools/ entry | ✅ REGISTERED |
+| claude-mem | Already registered | ✅ DONE |
+| recall-stack | Already registered | ✅ DONE |
+| MemPalace | Register in registry.json, create tools/ entry | ✅ REGISTERED |
+| Obsidian integration | Via graphify --obsidian flag + recall-stack L5 | 🔲 INSTALL PENDING |
+| LESSONS.md | Create commander/LESSONS.md | ✅ DONE |
 
 **Acceptance criteria:**
-- All knowledge tools registered in registry.json with correct triggers
-- code-review-graph and graphify marked as ALWAYS/HIGH priority
-- LESSONS.md exists and Commander references it
+- ✅ All knowledge tools registered in registry.json with correct triggers
+- ✅ code-review-graph and graphify marked as ALWAYS/HIGH priority
+- ✅ LESSONS.md exists and Commander references it
+- 🔲 Tools need to be INSTALLED on Mac (pip install)
+- 🔲 Obsidian vault needs to be created and connected
 
 ### Phase 2: Execution Tools
 **Goal:** Register all new tools for design, browser, image, and video.  
@@ -141,19 +143,20 @@ New combinations to add:
 
 | Component | Action | Status |
 |-----------|--------|--------|
-| Lightpanda | Register, create tools/ entry | TODO |
-| nano-banana-2-skill | Register, create tools/ entry | TODO |
-| ui-ux-pro-max-skill | Register, create tools/ entry | TODO |
-| emilkowalski/skill | Register, create tools/ entry | TODO |
-| SuperDesign + MCP | Register, create tools/ entry | TODO |
-| OpenMontage | Register, create tools/ entry | TODO |
-| Playwright MCP | Register, create tools/ entry | TODO |
-| Wan2GP | Register (conditional), create tools/ entry | TODO |
+| Lightpanda | Register, create tools/ entry | ✅ REGISTERED |
+| nano-banana-2-skill | Register, create tools/ entry | ✅ REGISTERED |
+| ui-ux-pro-max-skill | Register, create tools/ entry | ✅ REGISTERED |
+| emilkowalski/skill | Register, create tools/ entry | ✅ REGISTERED |
+| SuperDesign + MCP | Register, create tools/ entry | ✅ REGISTERED |
+| OpenMontage | Register, create tools/ entry | ✅ REGISTERED |
+| Playwright MCP | Register, create tools/ entry | ✅ REGISTERED |
+| Wan2GP | Register (conditional), create tools/ entry | ✅ REGISTERED |
 
 **Acceptance criteria:**
-- All tools registered with activation triggers, anti-triggers, cost profiles
-- New tool_combinations added for web design, video, research, creative brief
-- No tool missing from registry that was discussed
+- ✅ All tools registered with activation triggers, anti-triggers, cost profiles
+- ✅ New tool_combinations added for web design, video, research, creative brief
+- ✅ No tool missing from registry that was discussed
+- 🔲 Tools need to be INSTALLED on Mac
 
 ### Phase 3: Commander Agent
 **Goal:** Build the orchestration brain.  
@@ -162,20 +165,21 @@ New combinations to add:
 
 | Component | Action | Status |
 |-----------|--------|--------|
-| COMMANDER.md | Core orchestration skill file | TODO |
-| BORIS_PRINCIPLES.md | Engineering philosophy | TODO |
-| COST_CONTROL.md | Zero-cost-first protocol | TODO |
-| CREDENTIALS.md | API key handling protocol | TODO |
-| MISSION_BOARD_TEMPLATE.md | Per-project template | TODO |
-| AGENTS.md update | Point to Commander as primary | TODO |
-| setup.sh update | Add Commander awareness | TODO |
+| COMMANDER.md | Core orchestration skill file | ✅ DONE |
+| BORIS_PRINCIPLES.md | Engineering philosophy | ✅ DONE |
+| COST_CONTROL.md | Zero-cost-first protocol | ✅ DONE |
+| CREDENTIALS.md | API key handling protocol | ✅ DONE |
+| MISSION_BOARD_TEMPLATE.md | Per-project template | ✅ DONE |
+| AGENTS.md update | Point to Commander as primary | ✅ DONE |
+| setup.sh update | Add Commander awareness | ✅ DONE |
 
 **Acceptance criteria:**
-- Commander can read registry.json and classify any task
-- Commander decomposes tasks into dependency graphs
-- Commander selects optimal tool combination per task
-- Commander enforces cost control, credential safety, Boris principles
-- Commander writes mission board for every non-trivial task
+- ✅ Commander can read registry.json and classify any task
+- ✅ Commander decomposes tasks into dependency graphs
+- ✅ Commander selects optimal tool combination per task
+- ✅ Commander enforces cost control, credential safety, Boris principles
+- ✅ Commander writes mission board for every non-trivial task
+- 🔲 Needs live testing with a real brief
 
 ### Phase 4: Inter-Agent Communication
 **Goal:** Enable agents to share context and hand off work.  
@@ -219,18 +223,37 @@ This session focuses on **Phase 1 + Phase 2 + Phase 3** — the knowledge layer,
 
 1. ✅ Create commander/ directory
 2. ✅ Create PLANNING.md (this file)
-3. 🔲 Create COMMANDER.md (core orchestration skill)
-4. 🔲 Create BORIS_PRINCIPLES.md
-5. 🔲 Create COST_CONTROL.md
-6. 🔲 Create CREDENTIALS.md
-7. 🔲 Create MISSION_BOARD_TEMPLATE.md
-8. 🔲 Create LESSONS.md (empty, ready for entries)
-9. 🔲 Create tools/ entries for all new tools
-10. 🔲 Update registry.json with all new tools + combinations
-11. 🔲 Update AGENTS.md to reference Commander
-12. 🔲 Update setup.sh for Commander awareness
-13. 🔲 Update README.md to reflect JARVIS architecture
-14. 🔲 Commit everything to GitHub
+3. ✅ Create COMMANDER.md (core orchestration skill)
+4. ✅ Create BORIS_PRINCIPLES.md
+5. ✅ Create COST_CONTROL.md
+6. ✅ Create CREDENTIALS.md
+7. ✅ Create MISSION_BOARD_TEMPLATE.md
+8. ✅ Create LESSONS.md (empty, ready for entries)
+9. ✅ Create tools/ entries for all 11 new tools (.source files)
+10. ✅ Update registry.json with all new tools (14→25) + combinations (7→11)
+11. ✅ Update AGENTS.md to reference Commander
+12. ✅ Update setup.sh for Commander awareness
+13. ✅ Update README.md to reflect JARVIS architecture
+14. ✅ Commit everything to GitHub (commits: 6d72f53, 05d414f)
+
+**Remaining build tasks:**
+
+15. 🔲 Run `bash setup.sh` on Mac (inject JARVIS into global ~/.claude/CLAUDE.md)
+16. 🔲 Install code-review-graph on Mac (`pip install code-review-graph && code-review-graph install`)
+17. 🔲 Install graphify on Mac (`pip install graphifyy && graphify install`)
+18. 🔲 Install MemPalace on Mac (`pip install mempalace && mempalace install`)
+19. 🔲 Install claude-mem plugin in Claude Code
+20. 🔲 Create Obsidian vault and configure graphify --obsidian export path
+21. 🔲 Configure recall-stack Layer 5 to read from Obsidian vault
+22. 🔲 Install Lightpanda binary on Mac
+23. 🔲 Configure Playwright MCP in Claude Code
+24. 🔲 Install nano-banana-2 (requires Gemini API key — free tier)
+25. 🔲 Install ui-ux-pro-max plugin in Claude Code
+26. 🔲 Install emilkowalski/skill via npx
+27. 🔲 Configure SuperDesign MCP server
+28. 🔲 Clone OpenMontage repo
+29. 🔲 Test Commander with a real project brief
+30. 🔲 Update PLANNING.md with test results and lessons
 
 ---
 
@@ -293,3 +316,5 @@ This session focuses on **Phase 1 + Phase 2 + Phase 3** — the knowledge layer,
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2026-04-11 | Initial PLANNING.md, Commander architecture defined |
+| 0.2.0 | 2026-04-11 | All Commander files built, 11 new tools registered, AGENTS.md + setup.sh updated, pushed to GitHub |
+| 0.3.0 | 2026-04-11 | PLANNING.md updated with accurate build status. Next: tool installations + Obsidian setup |
