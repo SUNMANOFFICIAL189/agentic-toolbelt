@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-04-14",
+  "description": "Agent Bank — precision-crafted agents forged via prompt-engineer methodology. Commander reads this registry to match tasks to agents automatically.",
+  "forge_skill": "~/Claude_Skills/agent-forge/SKILL.md",
+  "prompt_engine": "~/Claude_Skills/prompt-engineer/SKILL.md",
+  "agent_directory": "~/claude-hq/agents/",
+  "schema": {
+    "id": "Unique agent identifier (kebab-case)",
+    "name": "Human-readable agent name",
+    "file": "SKILL.md filename relative to agent_directory",
+    "category": "Agent category for grouping",
+    "model_tier": "haiku | sonnet | opus — recommended model for this agent",
+    "description": "One-line description of what this agent does",
+    "activation_triggers": "Array of phrases/contexts that should activate this agent",
+    "anti_triggers": "Array of contexts where this agent should NOT be used",
+    "input_spec": "What the agent expects to receive",
+    "output_spec": "What the agent produces",
+    "pairs_with": "Array of other agent IDs this agent works well alongside",
+    "forged_date": "ISO date when agent was created",
+    "forged_version": "Version number for iteration tracking"
+  },
+  "categories": [
+    "research",
+    "code-generation",
+    "code-review",
+    "architecture",
+    "content-creation",
+    "data-analysis",
+    "testing",
+    "security",
+    "devops",
+    "strategy",
+    "design",
+    "debugging"
+  ],
+  "agents": [
+    {
+      "id": "code-architect",
+      "name": "Code Architect",
+      "file": "code-architect/SKILL.md",
+      "category": "architecture",
+      "model_tier": "opus",
+      "description": "Produces buildable system architectures from project briefs — component breakdown, API contracts, file structure, build order for agent task decomposition",
+      "activation_triggers": [
+        "Design the architecture for a new project",
+        "Plan the system structure before building",
+        "User says how should I structure this or tech stack for X",
+        "Commander Step 3 (decompose) needs architectural decisions first",
+        "PRD provided that needs system design before coding begins",
+        "User asks about technology selections or component design"
+      ],
+      "anti_triggers": [
+        "Simple scripts or single-file tools — no architecture needed",
+        "Bug fixes or modifications to existing code",
+        "Content creation, research, or non-software tasks",
+        "Projects where architecture is already defined"
+      ],
+      "input_spec": "Project brief, PRD, or natural language description of what to build. Optionally: constraints (team size, budget, timeline, deployment target).",
+      "output_spec": "Structured architecture document: technology selections with rationale, component breakdown with interfaces, data flow, file structure, API contracts, build order (parallelizable task graph), risks and trade-offs.",
+      "pairs_with": [],
+      "forged_date": "2026-04-14",
+      "forged_version": "1.0.0"
+    }
+  ]
+}

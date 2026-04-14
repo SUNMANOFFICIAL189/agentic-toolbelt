@@ -72,6 +72,7 @@ STEP 0: PROJECT BOOTSTRAP (fully automatic — no user action required)
 STEP 1: LOAD CONTEXT
 ├── Read commander/LESSONS.md (past mistakes to avoid — DO THIS FIRST)
 ├── Read registry.json (available tools, skills, agents)
+├── Read agents/registry.json (Agent Bank — precision-crafted agents)
 ├── Read commander/COST_CONTROL.md (spending rules)
 ├── Read commander/CREDENTIALS.md (sensitive data rules)
 └── Read commander/BORIS_PRINCIPLES.md (engineering philosophy)
@@ -82,6 +83,11 @@ STEP 2: CLASSIFY TASK
 ├── What domains? (frontend / backend / design / content / data / video / etc.)
 ├── What tools in registry match? (scan activation_triggers)
 ├── What tool_combination fits? (check predefined stacks)
+├── AGENT BANK SCAN: Check agents/registry.json for matching agents
+│   ├── Match task against agent activation_triggers
+│   ├── If match found → load that agent's SKILL.md for the relevant sub-task
+│   ├── If no match but agent would help → trigger Agent Forge to create one
+│   └── If no agent needed → proceed with tools/skills only
 ├── Any cost implications? (APIs, services, subscriptions)
 └── Any credentials needed? (API keys — list them now, resolve in Step 4)
 
@@ -292,4 +298,7 @@ All graphify exports target this vault. The Commander uses this path automatical
 | `commander/MISSION_BOARD_TEMPLATE.md` | Template for per-project mission boards |
 | `commander/LESSONS.md` | Global self-improvement log |
 | `registry.json` | Tool catalog (Commander reads this at activation) |
+| `agents/registry.json` | Agent Bank — precision-crafted agent index |
+| `~/Claude_Skills/agent-forge/SKILL.md` | Agent Forge — produces new agents via prompt-engineer methodology |
+| `~/Claude_Skills/prompt-engineer/SKILL.md` | Prompt engineering methodology — powers Agent Forge |
 | `.claude/AGENTS.md` | Master system prompt (loads Commander) |

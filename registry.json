@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-04-11",
+  "last_updated": "2026-04-14",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center for JARVIS — an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
-  "tool_count": 25,
+  "tool_count": 27,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
@@ -950,6 +950,63 @@
       "priority": "LOW",
       "status": "conditional",
       "added_date": "2026-04-11"
+    },
+    {
+      "id": "agent-forge",
+      "name": "Agent Forge — Precision Agent Factory",
+      "source": "local://Claude_Skills/agent-forge/",
+      "type": "local_skill",
+      "category": "orchestration",
+      "owner": "SUNMANOFFICIAL189",
+      "description": "Meta-skill that produces precision-crafted autonomous agents using prompt-engineer methodology. 5-phase forge protocol: Define → Architect → Stress-Test → Produce → File. Outputs SKILL.md files into the Agent Bank with registry entries for Commander auto-discovery.",
+      "activation_triggers": [
+        "User says forge an agent, create an agent, build me an agent for X",
+        "Commander needs a specialized agent that doesn't exist in the agent bank",
+        "User says new agent, agent forge, or I need an agent that...",
+        "Building a suite of agents for a multi-agent workflow"
+      ],
+      "anti_triggers": [
+        "Using an existing agent from the bank — just load it, don't re-forge",
+        "Quick one-off tasks that don't need a reusable agent",
+        "Modifying an existing agent — update its SKILL.md directly"
+      ],
+      "dependencies": [
+        "prompt-engineer"
+      ],
+      "setup_instructions": {
+        "method": "read_skill_files",
+        "command": "Read ~/Claude_Skills/agent-forge/SKILL.md and ~/Claude_Skills/prompt-engineer/SKILL.md — both must be loaded for the forge to operate"
+      },
+      "integration_notes": "The agent factory. Depends on prompt-engineer for methodology. Outputs to ~/claude-hq/agents/ with registry entries. Commander scans the agent registry at task classification time to find matching agents. The forge only runs when a NEW agent is needed — existing agents are loaded directly.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-14"
+    },
+    {
+      "id": "agent-bank",
+      "name": "Agent Bank — Precision Agent Registry",
+      "source": "local://claude-hq/agents/",
+      "type": "local_registry",
+      "category": "orchestration",
+      "owner": "SUNMANOFFICIAL189",
+      "description": "Registry of precision-crafted agents forged via Agent Forge. Commander reads ~/claude-hq/agents/registry.json at task classification time to find matching agents by activation triggers. Each agent is a self-contained SKILL.md.",
+      "activation_triggers": [
+        "ANY task that might have a matching specialized agent",
+        "Commander Step 2 (task classification) — always scan agent bank",
+        "User says use my agents, check the agent bank, or which agents do I have"
+      ],
+      "anti_triggers": [
+        "Creating new agents — that's agent-forge, not agent-bank"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "read_registry",
+        "command": "Read ~/claude-hq/agents/registry.json and scan agents array for matching activation_triggers"
+      },
+      "integration_notes": "Passive registry — Commander consults it during task classification. No setup needed. Agents are added by agent-forge. To use an agent: read its SKILL.md from the path in the registry entry.",
+      "priority": "ALWAYS",
+      "status": "active",
+      "added_date": "2026-04-14"
     }
   ],
   "skills": [
