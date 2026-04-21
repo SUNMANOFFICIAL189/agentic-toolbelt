@@ -53,14 +53,67 @@ if [[ "$TOOL_NAME" != "Bash" ]]; then
   exit 0
 fi
 
+# Inline override detection — user prefixes command with HQ_TRUST_OVERRIDE=1.
+# Needed because PreToolUse hooks run before the command executes; env vars
+# set on the command line never reach this process. Detect in the command string.
+OVERRIDE_INLINE=0
+if [[ "$CMD" =~ (^|[[:space:]]|\')HQ_TRUST_OVERRIDE=1([[:space:]]|$) ]]; then
+  OVERRIDE_INLINE=1
+fi
+
+# Extract the real URL for `git clone` by tokenising and skipping flags.
+# The old regex failed on `--branch NAME URL` because it treated the branch
+# name as the URL. Use shlex via python3 for robust parsing.
+parse_git_clone_url() {
+  CMD="$CMD" python3 - <<'PY'
+import os, shlex, sys
+cmd = os.environ.get('CMD', '')
+try:
+    toks = shlex.split(cmd, posix=True)
+except ValueError:
+    sys.exit(1)
+# Walk to first "git clone"
+start = None
+for i in range(len(toks) - 1):
+    if toks[i] == 'git' and toks[i+1] == 'clone':
+        start = i + 2
+        break
+if start is None:
+    sys.exit(1)
+# Flags that take a value as the next token
+FLAGS_WITH_VAL = {
+    '-b', '--branch', '--depth', '--shallow-since', '--shallow-exclude',
+    '--reference', '--reference-if-able', '--origin', '-o', '--upload-pack',
+    '--template', '--separate-git-dir', '-c', '-j', '--jobs', '--filter',
+    '--bundle-uri', '--server-option', '--recurse-submodules',
+}
+skip = False
+for tok in toks[start:]:
+    if skip:
+        skip = False
+        continue
+    if tok in FLAGS_WITH_VAL:
+        skip = True
+        continue
+    if tok.startswith('-'):
+        # flag (possibly --foo=bar) — skip
+        continue
+    print(tok)
+    sys.exit(0)
+sys.exit(1)
+PY
+}
+
 # Extract install-style commands worth gating
-# Uses a single regex pass to detect the install patterns we care about.
 TARGET=""
 GATE_TIER=""
 
-# git clone https://github.com/OWNER/REPO or git@github.com:OWNER/REPO
-if [[ "$CMD" =~ git[[:space:]]+clone[[:space:]]+(--[a-z-]+[[:space:]]+)*([^[:space:]]+) ]]; then
-  TARGET="${BASH_REMATCH[2]}"
+# git clone — URL extracted via tokenised parser (handles --branch, --depth, etc.)
+if [[ "$CMD" =~ git[[:space:]]+clone([[:space:]]|$) ]]; then
+  set +e
+  TARGET="$(parse_git_clone_url)"
+  set -e
+  [[ -z "$TARGET" ]] && { log "git clone but no URL extracted — allowing"; exit 0; }
   GATE_TIER="B"
 
 # npx skills add OWNER/REPO@skill — always Tier C
@@ -104,7 +157,7 @@ skills.sh installs require the full Tier C pipeline (Magika + secret-scan + Sock
 Route this through: /scout "<description>"
 Or bypass this gate for one command by prefixing: HQ_TRUST_OVERRIDE=1 <your command>
 EOF
-  [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" ]] && { log "override used on Tier C for $TARGET"; exit 0; }
+  [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" || "$OVERRIDE_INLINE" == "1" ]] && { log "override used on Tier C for $TARGET"; exit 0; }
   exit 2
 fi
 
@@ -125,7 +178,7 @@ Trust Gate: BLOCK — '$TARGET' is in active cooling-off period.
 See: $HQ_ROOT/commander/INCIDENT_LEDGER.md
 Override (not recommended): prefix command with HQ_TRUST_OVERRIDE=1
 EOF
-    [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" ]] && { log "override used on cooling-off for $TARGET"; exit 0; }
+    [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" || "$OVERRIDE_INLINE" == "1" ]] && { log "override used on cooling-off for $TARGET"; exit 0; }
     exit 2
     ;;
   2)
@@ -134,7 +187,7 @@ Trust Gate: UNKNOWN AUTHOR — '$TARGET'
 Recommend routing through Tier C (/scout or skill-install.sh).
 To proceed anyway (acknowledges risk), prefix: HQ_TRUST_OVERRIDE=1
 EOF
-    [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" ]] && { log "override used on unknown author for $TARGET"; exit 0; }
+    [[ "${HQ_TRUST_OVERRIDE:-0}" == "1" || "$OVERRIDE_INLINE" == "1" ]] && { log "override used on unknown author for $TARGET"; exit 0; }
     exit 2
     ;;
 esac

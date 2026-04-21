@@ -108,6 +108,14 @@ Defined in `scripts/lib/advisory-check.sh`. Current list:
 
 **Allowlist does not skip Layer 1.** File-content scans still run after clone.
 
+### Self-hosted infra (Layer 0.5)
+
+Servers you own and operate directly (not public registries). Defined in `SELF_HOSTED=(…)` in `advisory-check.sh`. Current list:
+
+- `204.168.204.247` — polymarket-bot production server
+
+Matched when an SSH clone URL (e.g. `root@204.168.204.247:/opt/polymarket-bot`) or explicit-scheme URL resolves to a listed host/IP. Still runs Magika + secret-scan post-clone. Cooling-off always takes precedence over this list.
+
 ---
 
 ## Operational contract
@@ -153,6 +161,17 @@ Three legitimate override scenarios:
    override
 
 Every override is logged in `scripts/.trust-gate.log`. Review quarterly.
+
+### How to use `HQ_TRUST_OVERRIDE=1`
+
+The PreToolUse hook runs BEFORE the command executes, so it sees the command as a string — inline env assignments don't reach child processes. Two paths:
+
+1. **Inline prefix** (parsed by the hook from the command string):
+   `HQ_TRUST_OVERRIDE=1 git clone https://github.com/foo/bar.git`
+   The hook detects `HQ_TRUST_OVERRIDE=1` as a bare token in the command and grants override.
+
+2. **Shell env** (set before Claude Code starts):
+   `export HQ_TRUST_OVERRIDE=1` then launch `claude`. Every command in that session inherits the override — use for audit/debug sessions only, never as default.
 
 ---
 

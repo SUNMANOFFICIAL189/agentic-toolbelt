@@ -32,20 +32,49 @@ ALLOWLIST=(
   "ruvnet"
 )
 
-# Parse owner from URL or owner/repo string
+# Self-hosted infra owned by the operator — auto-pass Layer 0.5.
+# Match is exact against extracted host/IP. Post-clone Magika + secret-scan
+# still run, so this is defence-in-depth, not blind trust.
+SELF_HOSTED=(
+  "204.168.204.247"   # polymarket-bot production server
+)
+
+# Parse owner/host from URL or owner/repo string. Returns:
+#   github.com URL   → the GitHub org (e.g. "anthropics")
+#   other URL (https://, ssh://, git://) → the hostname
+#   SCP-style user@host:path → the hostname
+#   owner/repo or owner/repo@skill → owner
 extract_owner() {
   local input="$1"
-  # git@github.com:owner/repo.git
+  # GitHub SSH or HTTPS: github.com:owner/... or github.com/owner/...
   if [[ "$input" =~ github\.com[:/]([^/]+)/ ]]; then
     echo "${BASH_REMATCH[1]}"
     return 0
   fi
-  # owner/repo or owner/repo@skill
+  # SCP-style SSH: user@host:/path or user@host:path
+  if [[ "$input" =~ ^[^@[:space:]]+@([^:/[:space:]]+): ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  # Explicit URL schemes: https://host/... ssh://host/... git://host/...
+  if [[ "$input" =~ ^[a-z][a-z+]*://([^/[:space:]]+)(/|$) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  # owner/repo or owner/repo@skill (skills.sh form)
   if [[ "$input" =~ ^([a-zA-Z0-9_.-]+)/ ]]; then
     echo "${BASH_REMATCH[1]}"
     return 0
   fi
   echo ""
+  return 1
+}
+
+is_self_hosted() {
+  local owner="$1"
+  for h in "${SELF_HOSTED[@]}"; do
+    [[ "$h" == "$owner" ]] && return 0
+  done
   return 1
 }
 
@@ -92,6 +121,11 @@ advisory_check() {
   if is_in_cooling_off "$owner"; then
     echo "advisory_check: BLOCK — $owner is in cooling-off (see INCIDENT_LEDGER.md)" >&2
     return 1
+  fi
+
+  if is_self_hosted "$owner"; then
+    echo "advisory_check: SELF-HOSTED — $owner (metadata auto-pass, Magika still runs post-clone)" >&2
+    return 0
   fi
 
   if is_allowlisted "$owner"; then

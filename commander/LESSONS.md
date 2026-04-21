@@ -72,3 +72,48 @@
 - **How to apply:** For npm/pip installs from unknown authors, prefer
   `--ignore-scripts` flag when available. For unknown authors, clone first
   (Tier B gated), scan with Tier C tools manually, then install.
+
+### 7. Parse `git clone` with a tokeniser, not a single regex
+- **Rule:** Never use a one-shot bash regex to extract the URL from a
+  `git clone` command line. Use `shlex` (or equivalent) to tokenise, then
+  walk the tokens skipping flags-with-values (`--branch NAME`, `--depth N`,
+  `-b NAME`, etc.).
+- **Why:** 2026-04-21 PATS-Copy relay-push incident — the original regex
+  `(--[a-z-]+[[:space:]]+)*([^[:space:]]+)` only consumed `--flag ` (no
+  value), so `git clone --branch strategy/hybrid-v1 root@SERVER:/path`
+  mis-identified `strategy/hybrid-v1` as the URL. `extract_owner` then
+  returned `strategy` and the whole clone was blocked as UNKNOWN. The
+  actual server URL was never inspected. `trust-gate.sh` now uses a Python
+  shlex parser with an explicit `FLAGS_WITH_VAL` set.
+- **How to apply:** Any future change to install-command parsing must
+  tokenise first. Add new flags-with-values to `FLAGS_WITH_VAL` in
+  `trust-gate.sh:parse_git_clone_url`.
+
+### 8. `HQ_TRUST_OVERRIDE=1` inline prefix is parsed from the command string
+- **Rule:** PreToolUse hooks cannot see env vars set on the command line
+  (the hook runs before the command executes, so the assignment never
+  reaches a child process). Inline `HQ_TRUST_OVERRIDE=1` is detected by
+  pattern-matching the command string itself, not by reading the
+  environment.
+- **Why:** Same 2026-04-21 incident — user retried with
+  `HQ_TRUST_OVERRIDE=1 bash -c '...'` and the override was silently
+  ignored because the hook only checked `${HQ_TRUST_OVERRIDE:-0}` from
+  its own env. Two paths now: (a) string-detection in the command, or
+  (b) `export HQ_TRUST_OVERRIDE=1` in the shell before launching Claude.
+- **How to apply:** When documenting override mechanics, always explain
+  both paths. Don't tell users to "prefix" without noting that it's a
+  string-pattern detection, not a real env-var pass-through.
+
+### 9. Self-hosted infra needs a separate allowlist from the author allowlist
+- **Rule:** `SUNMANOFFICIAL189` (GitHub username) and `204.168.204.247`
+  (server IP) are both operator-owned but belong in different lists.
+  Author allowlist is for GitHub owners. Self-hosted is for hosts/IPs
+  extracted from SCP-style (`user@host:/path`) and non-GitHub URL clones.
+  Do not conflate them.
+- **Why:** Extending the author allowlist to include IPs would make
+  `extract_owner` confused about whether `192.168.x.x` is a dotted owner
+  name or an IP. Separate list, separate matcher.
+- **How to apply:** Add new servers to `SELF_HOSTED=(…)` in
+  `advisory-check.sh`. Match runs after cooling-off, before author
+  allowlist. Post-clone Magika + secret-scan still execute — this is
+  defence-in-depth, not blind trust.
