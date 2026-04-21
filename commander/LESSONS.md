@@ -117,3 +117,66 @@
   `advisory-check.sh`. Match runs after cooling-off, before author
   allowlist. Post-clone Magika + secret-scan still execute — this is
   defence-in-depth, not blind trust.
+
+### 10. Verify backup BEFORE consolidating to a single canonical home
+- **Rule:** Never untrack, delete, or "centralise" to one location without
+  first confirming that location is itself backed up. If you're about to
+  say "X is now the single source of truth," verify that X has its own
+  backup before taking the consolidation step.
+- **Why:** 2026-04-21 — removed `graphify-out/` from claude-hq tracking,
+  declaring the Obsidian vault the canonical knowledge-graph home.
+  Vault had NO backup (no iCloud, no Obsidian Sync, no Time Machine, no
+  git). Sunil caught it in the next message. One disk failure and the
+  entire vault would have been lost. The consolidation was correct in
+  principle but premature in sequence.
+- **How to apply:** Before any `.gitignore` addition that removes a
+  previously-tracked artefact, or any "canonical home" declaration,
+  explicitly audit the new home's backup: iCloud / git remote / cloud
+  sync / Time Machine. If none, set one up FIRST, then consolidate.
+
+### 11. Don't invent vault taxonomy — extend what exists
+- **Rule:** Before proposing a new top-level folder or structure in the
+  Obsidian vault, check what conventions already exist. Extend those;
+  don't invent parallel hierarchies.
+- **Why:** 2026-04-21 — proposed moving `claude-hq` out of `Projects/`
+  and into a new `System/` folder to reflect infrastructure vs project
+  distinction. Sunil correctly pushed back: `System/` did not exist in
+  the vault, PATS-Copy already sat in `Projects/`, and inventing a new
+  tree fragmented the taxonomy for a purely semantic reason. Resolution:
+  keep in `Projects/`, differentiate via file naming convention
+  (descriptive vs numbered) instead.
+- **How to apply:** When unsure whether to add a new vault folder, ask
+  "does this map to a convention already used for another project?"
+  If yes, extend. If no, the right fix is usually a file-naming tweak
+  or a sub-folder, not a new top-level.
+
+### 12. Duplicating source in vault violates "no duplicates" even when framed as a summary
+- **Rule:** If you find yourself writing a vault-native file whose header
+  says "mirrors X" or "summary of X" where X is a source-controlled
+  file, stop. Use a symlink to X instead, or just wikilink from the Hub.
+  A summary copy always drifts from source.
+- **Why:** 2026-04-21 — created `05 Lessons Learned.md` in the vault as
+  a "summary" of `~/claude-hq/commander/LESSONS.md`, then 20 minutes later
+  wrote the anti-duplication rule in `docs/ORGANIZATION.md`. The same
+  session. Sunil caught the contradiction. Resolution: delete the
+  duplicate, symlink `Commander/` → `~/claude-hq/commander/` so all
+  source files (LESSONS, TRUST_GATE, etc.) surface in Obsidian without
+  copies.
+- **How to apply:** If a file's justification is "easier to browse" —
+  use a symlink. If the justification is "summarise for Obsidian" —
+  don't; the source is already markdown and Obsidian-native. Write a
+  wikilink from the Hub pointing at the source.
+
+### 13. `.gitignore` patterns with `/` are anchored to the gitignore's location
+- **Rule:** In a multi-level repo (where the `.gitignore` sits above
+  the actual content dir), patterns like `.obsidian/workspace.json`
+  will NOT match `<subdir>/.obsidian/workspace.json`. Use `**/` prefix:
+  `**/.obsidian/workspace.json`.
+- **Why:** 2026-04-21 — created `jarvis-brain` repo with `.gitignore`
+  at `~/Vaults/Jarvis-Brain/` and vault content at
+  `~/Vaults/Jarvis-Brain/JARVIS-BRAIN/`. Initial commit accidentally
+  tracked `JARVIS-BRAIN/.obsidian/workspace.json` because the pattern
+  without `**/` was interpreted relative to the repo root only.
+- **How to apply:** If your repo root is one level above the actual
+  content, prefix subdirectory-anchored patterns with `**/`. Test:
+  `git check-ignore -v <file>` should report the matching pattern.
