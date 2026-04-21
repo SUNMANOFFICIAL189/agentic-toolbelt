@@ -56,48 +56,76 @@ Artefacts fall into one of three layers. Each layer has a single canonical home.
 
 ## Knowledge layer — Obsidian vault
 
-**Root:** `/Users/sunil_rajput/Vaults/Jarvis-Brain/JARVIS-BRAIN/`
+**Path:** `/Users/sunil_rajput/Vaults/Jarvis-Brain/JARVIS-BRAIN/`
+**Backup:** `github.com/SUNMANOFFICIAL189/jarvis-brain` (private). Session-end commit + push.
 
 ```
 JARVIS-BRAIN/
-├── Projects/              — one folder per active project
-│   ├── claude-hq/
-│   │   ├── 00 claude-hq Hub.md        — MOC / entry point
-│   │   ├── 02 Architecture Overview.md
-│   │   ├── 04 Decision Log.md         — append-only
-│   │   ├── 05 Lessons Learned.md      — mirrors commander/LESSONS.md
-│   │   ├── Agents/                    — multi-agent briefings
-│   │   ├── Analyses/                  — dated assessments
-│   │   └── Graph/                     — graphify output (auto)
-│   └── PATS-Copy/                     — Polymarket bot project
-├── Research/              — cross-project research notes
-└── (other top-level vault folders — see Obsidian)
+├── Projects/              — one folder per active project or infrastructure
+│   ├── claude-hq/                            — this system
+│   │   ├── Hub.md                            — MOC / entry point
+│   │   ├── Architecture.md                   — system map
+│   │   ├── Decision Log.md                   — append-only with provenance tags
+│   │   ├── Commander/ → ~/claude-hq/commander/   — SYMLINK to source repo
+│   │   ├── Graph/                            — graphify output (auto)
+│   │   ├── Agents/                           — multi-agent briefings
+│   │   └── Analyses/                         — dated assessments
+│   └── PATS-Copy/                            — Polymarket bot
+│       ├── 00 PATS-Copy Hub.md               — numbered pattern (product project)
+│       ├── 01 PRD.md → Desktop/POLYMARKET.../prd-pats-copy-full.md   — SYMLINK
+│       ├── 02 Architecture Overview.md
+│       ├── 03 Mission Board.md
+│       ├── 04 Decision Log.md
+│       ├── 05 Lessons Learned.md
+│       ├── Agents/ Analyses/ Docs/           — Analyses contain more symlinks
+│       └── Graph/
+├── Research/              — cross-project research
+└── (historical graphify dumps at root — legacy, cleanup pending)
 ```
 
-### Naming convention for project folders
+### Two file-naming patterns, pick the right one
 
-Every project hub uses the numbered pattern:
-- `00 <Project> Hub.md` — MOC, always first
-- `01 PRD.md` — product requirements (symlinked to repo if applicable)
-- `02 Architecture Overview.md` — system map
-- `03 Mission Board.md` — active tasks (for build projects)
-- `04 Decision Log.md` — append-only, new at top
-- `05 Lessons Learned.md` — mirrors repo's LESSONS.md
-- `Analyses/` — dated deep-dives
-- `Agents/` — multi-agent briefings
-- `Docs/` — symlinked to repo's `docs/` (for code projects)
-- `Graph/` — graphify output (auto-populated)
+Projects are of two kinds. Pick the pattern that matches the shape of the work, not PATS-Copy-by-default.
 
-Skip any number that doesn't apply. Don't renumber.
+**(a) Deliverable-producing projects** — a product, a codebase being built, a campaign. Use the numbered pattern:
+- `00 <Project> Hub.md` — MOC
+- `01 PRD.md` — product requirements (symlink to repo if source lives elsewhere)
+- `02 Architecture Overview.md`
+- `03 Mission Board.md` — active tasks
+- `04 Decision Log.md` — append-only
+- `05 Lessons Learned.md` — mirrors repo's LESSONS.md (or symlink to repo file)
+
+Example: `PATS-Copy/` (the Polymarket bot is a product).
+
+**(b) Infrastructure / orchestration systems** — the brain, meta-tools, long-lived ops. Use descriptive filenames, no artificial numbering:
+- `Hub.md` — MOC
+- `Architecture.md` — system map
+- `Decision Log.md` — append-only with provenance tags
+- no artificial "01 PRD" or "03 Mission Board" — infrastructure doesn't have a PRD
+
+Example: `claude-hq/` (the orchestration brain is infrastructure).
+
+Both kinds share: `Agents/`, `Analyses/`, `Graph/`.
+
+### Symlinks over duplication (the PATS-Copy pattern)
+
+When a file lives in a source repo, surface it in the vault via symlink — don't copy it into the vault.
+
+- PATS-Copy example: `01 PRD.md` → `~/Desktop/POLYMARKET_TRADING_3.0/prd-pats-copy-full.md`
+- claude-hq example: `Commander/` → `~/claude-hq/commander/`
+
+Benefits: zero drift (one file on disk), bidirectional edits (Obsidian edits the repo file directly), wikilinks work (`[[Commander/LESSONS]]` resolves).
+
+Caveat: symlinks break if the target is deleted or moved. When moving source files, update vault symlinks in the same commit.
 
 ### Graphify target
 
-- **Default:** graphify writes to `graphify-out/` in the current directory (run state).
-- **Canonical export:** at session end or after major architecture change, run:
+- **Working set:** `<project>/graphify-out/` in the source repo (run state, gitignored).
+- **Canonical export:** at session end or after major architecture change:
   ```
   /graphify . --obsidian --obsidian-dir "/Users/sunil_rajput/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/<project>/Graph"
   ```
-- The per-project `Graph/` folder is the single source of truth for the knowledge graph.
+- The per-project `Graph/` folder in the vault is the authoritative knowledge graph.
 
 ---
 
@@ -131,29 +159,33 @@ Who writes what, when. Aligns with `commander/COMMANDER.md:274`.
 | graphify → Obsidian | End of session + major architecture change | `/graphify --update` then export to vault |
 | LESSONS.md | After any user correction | Append rule with why + how to apply |
 | INCIDENT_LEDGER.md | New vendor security incident | Add 90-day cooling-off entry |
+| Vault git backup | Session end | `cd ~/Vaults/Jarvis-Brain && git add -A && git commit -m "Session <timestamp>" && git push` |
 
 ---
 
 ## Checklist — starting a new project
 
-1. `mkdir ~/projects/<name>` (or wherever the user wants)
-2. `git init` + create `.gitignore` copying relevant sections from claude-hq
-3. GitHub repo via `gh repo create` (or MCP)
-4. Obsidian: `mkdir JARVIS-BRAIN/Projects/<name>` + create `00 <name> Hub.md`
-5. `mempalace init --yes .`
-6. Add to `claude-hq/registry.json` if reusable, or leave as one-off
-7. First commit: "feat: project scaffold"
+1. Decide: **deliverable-producing** (pattern a, numbered) or **infrastructure/orchestration** (pattern b, descriptive)? Pick naming accordingly.
+2. `mkdir ~/projects/<name>` (or wherever the user wants)
+3. `git init` + create `.gitignore` copying relevant sections from claude-hq
+4. GitHub repo via `gh repo create` (or MCP)
+5. Obsidian: `mkdir JARVIS-BRAIN/Projects/<name>` + create hub note (`00 <name> Hub.md` for pattern a, `Hub.md` for pattern b)
+6. Symlink any canonical source files into the vault (e.g. `ln -s ~/<repo>/docs Projects/<name>/Docs`)
+7. `mempalace init --yes .`
+8. Add to `claude-hq/registry.json` if reusable, or leave as one-off
+9. First commit: "feat: project scaffold"
 
 ---
 
 ## Checklist — ending a session
 
-1. Git: commit scoped, push
-2. Obsidian: append to `04 Decision Log.md` if any architectural decision was made
-3. Obsidian: update `00 Hub.md` "Current State" section
+1. Git (source repo): commit scoped, push
+2. Obsidian: append to Decision Log if any architectural decision was made (tag with provenance: `[Sunil · strategic]` / `[Claude · implementation]` / `[Joint]`)
+3. Obsidian: update Hub's "Current State" section if facts changed
 4. MemPalace: `mempalace mine .`
 5. graphify: run `/graphify --update` (incremental) and if any INFERRED edges were added, export to vault `Graph/` folder
 6. LESSONS.md: append any new rules from corrections this session
+7. Git (vault): `cd ~/Vaults/Jarvis-Brain && git add -A && git commit -m "Session $(date +%F-%H%M)" && git push`
 
 ---
 
