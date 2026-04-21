@@ -75,7 +75,9 @@ STEP 1: LOAD CONTEXT
 ├── Read agents/registry.json (Agent Bank — precision-crafted agents)
 ├── Read commander/COST_CONTROL.md (spending rules)
 ├── Read commander/CREDENTIALS.md (sensitive data rules)
-└── Read commander/BORIS_PRINCIPLES.md (engineering philosophy)
+├── Read commander/BORIS_PRINCIPLES.md (engineering philosophy)
+├── Read commander/TRUST_GATE.md (supply-chain security protocol — mandatory for all external code)
+└── Read commander/INCIDENT_LEDGER.md (active vendor cooling-off periods)
 
 STEP 2: CLASSIFY TASK
 ├── What kind of problem? (software / creative / research / operations / hybrid)
@@ -88,6 +90,14 @@ STEP 2: CLASSIFY TASK
 │   ├── If match found → load that agent's SKILL.md for the relevant sub-task
 │   ├── If no match but agent would help → trigger Agent Forge to create one
 │   └── If no agent needed → proceed with tools/skills only
+├── SKILLS.SH FALLBACK (NEW — Step 2.5): If no registry or Agent Bank match
+│   ├── Invoke /scout "<task description>" to query skills.sh
+│   ├── /scout filters cooling-off authors automatically (INCIDENT_LEDGER.md)
+│   ├── Present top candidates to user, ranked by install count + allowlist status
+│   ├── Never auto-install — always ask user to pick
+│   ├── Install ALWAYS via scripts/skill-install.sh (Tier C full pipeline)
+│   │   └── All 5 layers mandatory: advisory → Magika → secret-scan → Socket → reputation
+│   └── Default scope: project. Promote to global only after 2+ clean uses.
 ├── Any cost implications? (APIs, services, subscriptions)
 └── Any credentials needed? (API keys — list them now, resolve in Step 4)
 

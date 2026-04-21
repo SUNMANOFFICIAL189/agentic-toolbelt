@@ -1,16 +1,17 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-04-14",
+  "last_updated": "2026-04-21",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
-  "description": "The central command center for JARVIS — an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
-  "tool_count": 27,
+  "description": "The central command center for JARVIS \u2014 an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
+  "tool_count": 32,
   "skill_count": 10,
   "auto_trigger_rules": [
-    "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation — this means a long-running project",
+    "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation \u2014 this means a long-running project",
     "ANY mention of 'build me', 'create an app', 'develop a system' triggers full-stack activation",
     "ANY multi-session project triggers token-efficiency at minimum",
-    "Claude should ALWAYS check this registry before starting a major project"
+    "Claude should ALWAYS check this registry before starting a major project",
+    "ANY clone/install from an untrusted author \u2192 route through Trust Gate (TRUST_GATE.md)"
   ],
   "tools": [
     {
@@ -93,7 +94,7 @@
         "Any PRD-driven project where context must persist",
         "User says remember this or needs cross-session memory",
         "Projects where decisions and observations must be recalled later",
-        "When token-efficiency CCD alone is insufficient — need richer persistent memory",
+        "When token-efficiency CCD alone is insufficient \u2014 need richer persistent memory",
         "Complex codebases where search over past observations adds value"
       ],
       "anti_triggers": [
@@ -150,7 +151,7 @@
     },
     {
       "id": "everything-claude-code",
-      "name": "Everything Claude Code — Performance Optimization System",
+      "name": "Everything Claude Code \u2014 Performance Optimization System",
       "source": "https://github.com/affaan-m/everything-claude-code",
       "type": "github_repo",
       "category": "optimization",
@@ -158,7 +159,7 @@
       "description": "The performance optimization system for AI agent harnesses. 21 agents, 102 skills, 52 commands, hooks, rules, and MCP configs. Covers TDD, code review, security scanning, continuous learning, strategic compaction, multi-agent orchestration, and cross-platform support (Claude Code, Cursor, Codex, OpenCode).",
       "activation_triggers": [
         "Need for structured development workflows (TDD, code review, security)",
-        "Want continuous learning — auto-extract patterns from sessions",
+        "Want continuous learning \u2014 auto-extract patterns from sessions",
         "Need code review agents, security scanning, or build error resolution",
         "Projects requiring professional development practices",
         "User mentions TDD, code review, security scan, or quality gates",
@@ -183,15 +184,15 @@
     },
     {
       "id": "paul-framework",
-      "name": "PAUL — Plan-Apply-Unify Loop",
+      "name": "PAUL \u2014 Plan-Apply-Unify Loop",
       "source": "https://github.com/ChristopherKahler/paul",
       "type": "github_repo",
       "category": "workflow",
       "owner": "external",
-      "description": "Structured AI-assisted development framework for Claude Code. Enforces Plan-Apply-Unify loop integrity — every plan gets closed with mandatory UNIFY. Acceptance-driven development with BDD criteria, in-session context management, state persistence via STATE.md, and 26 slash commands.",
+      "description": "Structured AI-assisted development framework for Claude Code. Enforces Plan-Apply-Unify loop integrity \u2014 every plan gets closed with mandatory UNIFY. Acceptance-driven development with BDD criteria, in-session context management, state persistence via STATE.md, and 26 slash commands.",
       "activation_triggers": [
         "Projects requiring structured planning with acceptance criteria",
-        "When loop integrity matters — every plan must close properly",
+        "When loop integrity matters \u2014 every plan must close properly",
         "User wants BDD-style Given/When/Then acceptance criteria",
         "Projects where state must persist across sessions via STATE.md",
         "When autonomous-agent-system needs more structured planning gates",
@@ -210,23 +211,23 @@
         "command": "npx paul-framework",
         "post_install": "Run /paul:init in Claude Code to initialize in your project"
       },
-      "integration_notes": "PAUL and autonomous-agent-system solve similar problems differently. Autonomous-agent-system is speed-optimized (fire-and-forget micro-tasks). PAUL is quality-optimized (mandatory closure, acceptance criteria). Choose based on project needs, or combine: use PAUL for planning/closure and autonomous-agent-system for execution. SEED is the ideation phase that feeds into PAUL — always consider SEED first when starting a new project.",
+      "integration_notes": "PAUL and autonomous-agent-system solve similar problems differently. Autonomous-agent-system is speed-optimized (fire-and-forget micro-tasks). PAUL is quality-optimized (mandatory closure, acceptance criteria). Choose based on project needs, or combine: use PAUL for planning/closure and autonomous-agent-system for execution. SEED is the ideation phase that feeds into PAUL \u2014 always consider SEED first when starting a new project.",
       "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-17"
     },
     {
       "id": "seed",
-      "name": "SEED — Typed Project Incubator",
+      "name": "SEED \u2014 Typed Project Incubator",
       "source": "https://github.com/ChristopherKahler/seed",
       "type": "github_repo",
       "category": "workflow",
       "owner": "external",
-      "description": "AI project incubator that takes raw ideas through type-aware guided exploration and produces structured PLANNING.md files ready for building. 5 project types (Application/deep, Workflow/standard, Client/standard, Utility/tight, Campaign/creative) each with adaptive rigor, guided conversation sections, and type-specific templates. Coach persona brainstorms alongside you — not an interrogator. Graduates mature plans into buildable project directories. /seed launch does graduation + headless PAUL init in one command — zero-friction ideation-to-build handoff. Pure markdown, zero runtime deps.",
+      "description": "AI project incubator that takes raw ideas through type-aware guided exploration and produces structured PLANNING.md files ready for building. 5 project types (Application/deep, Workflow/standard, Client/standard, Utility/tight, Campaign/creative) each with adaptive rigor, guided conversation sections, and type-specific templates. Coach persona brainstorms alongside you \u2014 not an interrogator. Graduates mature plans into buildable project directories. /seed launch does graduation + headless PAUL init in one command \u2014 zero-friction ideation-to-build handoff. Pure markdown, zero runtime deps.",
       "activation_triggers": [
         "User has a new project idea and needs to plan it out before building",
         "User says I have an idea, I want to plan, let me think this through, or seed this",
-        "ANY new project that will use PAUL — SEED should run first to produce PLANNING.md",
+        "ANY new project that will use PAUL \u2014 SEED should run first to produce PLANNING.md",
         "User wants guided ideation or brainstorming for an app, workflow, client site, utility, or campaign",
         "User mentions campaign planning, content campaign, or marketing launch planning",
         "User is starting a project from scratch and hasn't defined requirements yet",
@@ -246,14 +247,14 @@
         "post_install": "Run /seed in Claude Code to start guided ideation",
         "alternative": "git clone https://github.com/ChristopherKahler/seed.git ~/claude-hq/repos/seed"
       },
-      "integration_notes": "SEED is the ideation phase that precedes PAUL. The workflow is: SEED (ideate → PLANNING.md) → PAUL (structured build from PLANNING.md). /seed launch wraps both: graduates the plan and initializes PAUL with headless context so PAUL never re-asks questions SEED already answered. For campaign-type projects, pairs naturally with claude-creator-skills and humanizer. Part of the Chris Kahler ecosystem (PAUL, AEGIS, BASE, CARL, Skillsmith).",
+      "integration_notes": "SEED is the ideation phase that precedes PAUL. The workflow is: SEED (ideate \u2192 PLANNING.md) \u2192 PAUL (structured build from PLANNING.md). /seed launch wraps both: graduates the plan and initializes PAUL with headless context so PAUL never re-asks questions SEED already answered. For campaign-type projects, pairs naturally with claude-creator-skills and humanizer. Part of the Chris Kahler ecosystem (PAUL, AEGIS, BASE, CARL, Skillsmith).",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-03-26"
     },
     {
       "id": "recall-stack",
-      "name": "Recall Stack — 5-Layer Memory Architecture",
+      "name": "Recall Stack \u2014 5-Layer Memory Architecture",
       "source": "https://github.com/keshavsuki/recall-stack",
       "raw_claude_md": "https://raw.githubusercontent.com/keshavsuki/recall-stack/master/CLAUDE.md",
       "type": "github_repo",
@@ -267,7 +268,7 @@
         "User mentions recall, session memory, primer, or pick up where we left off",
         "Need for automatic git context injection at every session start",
         "User wants Obsidian vault integrated as knowledge base context",
-        "When claude-mem alone is insufficient — need structured layered memory with auto-rewriting state"
+        "When claude-mem alone is insufficient \u2014 need structured layered memory with auto-rewriting state"
       ],
       "anti_triggers": [
         "Single-session tasks with no continuity needs",
@@ -294,7 +295,7 @@
     },
     {
       "id": "claude-creator-skills",
-      "name": "Claude Creator Skills — 8-Skill Content Creation System",
+      "name": "Claude Creator Skills \u2014 8-Skill Content Creation System",
       "source": "local://tools/claude-creator-skills/",
       "type": "local_skill_collection",
       "category": "content-creation",
@@ -313,7 +314,7 @@
         },
         "brand-voice-guardian": {
           "file": "brand-voice-guardian.skill",
-          "purpose": "Extract and protect the creator's authentic voice across all content — builds a reusable Voice Card",
+          "purpose": "Extract and protect the creator's authentic voice across all content \u2014 builds a reusable Voice Card",
           "triggers": [
             "does this sound like me",
             "make it sound more like me",
@@ -335,7 +336,7 @@
         },
         "killer-scripter": {
           "file": "killer-scripter.skill",
-          "purpose": "Write scripts for Reels, YouTube, carousels that feel like conversation — 50 hook templates included",
+          "purpose": "Write scripts for Reels, YouTube, carousels that feel like conversation \u2014 50 hook templates included",
           "triggers": [
             "write a script",
             "write a reel",
@@ -378,7 +379,7 @@
         },
         "content-performance-debriefer": {
           "file": "content-performance-debriefer.skill",
-          "purpose": "Analyze content metrics to reveal what worked, why, and what to do next — weekly debriefs and monthly patterns",
+          "purpose": "Analyze content metrics to reveal what worked, why, and what to do next \u2014 weekly debriefs and monthly patterns",
           "triggers": [
             "analyze my content performance",
             "what worked this week",
@@ -395,7 +396,7 @@
         "User wants to build or refine their personal brand or creator business",
         "User mentions bio, landing page, offer copy, or DM scripts",
         "User asks for visual direction, shot lists, or AI image/video prompts",
-        "ANY content creation workflow — from ideation through measurement"
+        "ANY content creation workflow \u2014 from ideation through measurement"
       ],
       "anti_triggers": [
         "Pure software development tasks with no content creation",
@@ -406,7 +407,7 @@
       "setup_instructions": {
         "method": "read_skill_files",
         "command": "Read the relevant .skill file(s) from ~/claude-hq/tools/claude-creator-skills/ and internalize as operating behavior for this session",
-        "skill_selection_guide": "Match the user's intent to the skills_index triggers. Load one or more skills as needed. For a full content session, load them in pipeline order: research → voice → ideation → script → visual → repurpose → offer → debrief."
+        "skill_selection_guide": "Match the user's intent to the skills_index triggers. Load one or more skills as needed. For a full content session, load them in pipeline order: research \u2192 voice \u2192 ideation \u2192 script \u2192 visual \u2192 repurpose \u2192 offer \u2192 debrief."
       },
       "integration_notes": "First-party skill collection stored directly in the CLAUDE HQ repo (not an external reference). Each .skill file is self-contained with activation rules, output formats, and behavioral instructions. Load individual skills based on task, or chain multiple skills for a full content pipeline. Pairs well with brand-voice-guardian as a persistent filter across all other creator skills.",
       "priority": "HIGH",
@@ -415,7 +416,7 @@
     },
     {
       "id": "agent-skills-mega",
-      "name": "Agent Skills Mega Collection — 256 Skills",
+      "name": "Agent Skills Mega Collection \u2014 256 Skills",
       "source": "local://tools/agent-skills-mega/",
       "type": "local_skill_collection",
       "category": "skills-library",
@@ -438,14 +439,14 @@
         "command": "Search ~/claude-hq/tools/agent-skills-mega/skills_index.json for matching skill, then read from ~/claude-hq/repos/agent-skills-mega/skills/skills/[name]/",
         "skill_selection_guide": "Parse skills_index.json to find skills matching the user's intent by name or description. Read the skill's directory for instruction files."
       },
-      "integration_notes": "This is the catch-all skill library. If no other registered tool has a matching skill, search this index. The skills_index.json provides id, name, description, and path for all 256 skills. First-party — stored directly in CLAUDE HQ repo.",
+      "integration_notes": "This is the catch-all skill library. If no other registered tool has a matching skill, search this index. The skills_index.json provides id, name, description, and path for all 256 skills. First-party \u2014 stored directly in CLAUDE HQ repo.",
       "priority": "MEDIUM",
       "status": "active",
       "added_date": "2026-03-21"
     },
     {
       "id": "awesome-claude-code-subagents",
-      "name": "Awesome Claude Code Subagents — 138 Specialized Agents",
+      "name": "Awesome Claude Code Subagents \u2014 138 Specialized Agents",
       "source": "https://github.com/VoltAgent/awesome-claude-code-subagents",
       "type": "github_repo",
       "category": "agents",
@@ -456,7 +457,7 @@
         "Projects requiring language-specific expertise (Rust, Go, Python, etc.)",
         "Need for specialized domain agents (fintech, healthcare, IoT, etc.)",
         "Quality/security auditing subagents needed",
-        "Meta-orchestration — coordinating multiple subagents",
+        "Meta-orchestration \u2014 coordinating multiple subagents",
         "User mentions subagent, specialized agent, or language expert"
       ],
       "anti_triggers": [
@@ -476,12 +477,12 @@
     },
     {
       "id": "remotion-skills",
-      "name": "Remotion — Programmatic Video with React",
+      "name": "Remotion \u2014 Programmatic Video with React",
       "source": "https://github.com/remotion-dev/skills",
       "type": "github_repo",
       "category": "video",
       "owner": "external",
-      "description": "Official Remotion skill for Claude Code. Programmatic video creation using React — compositions, animations, audio sync, rendering to MP4/GIF. Build videos as code.",
+      "description": "Official Remotion skill for Claude Code. Programmatic video creation using React \u2014 compositions, animations, audio sync, rendering to MP4/GIF. Build videos as code.",
       "activation_triggers": [
         "User wants to create videos programmatically with React",
         "User mentions Remotion, programmatic video, or video-as-code",
@@ -506,7 +507,7 @@
     },
     {
       "id": "stitch-skills",
-      "name": "Google Stitch — Design-to-Code Skills",
+      "name": "Google Stitch \u2014 Design-to-Code Skills",
       "source": "https://github.com/google-labs-code/stitch-skills",
       "type": "github_repo",
       "category": "design",
@@ -528,7 +529,7 @@
       "setup_instructions": {
         "method": "clone_and_browse",
         "command": "git clone https://github.com/google-labs-code/stitch-skills.git ~/claude-hq/repos/stitch-skills",
-        "usage": "Read skills/ directory — design-md, react-components, stitch-loop"
+        "usage": "Read skills/ directory \u2014 design-md, react-components, stitch-loop"
       },
       "integration_notes": "Useful for frontend-heavy projects. Pairs with everything-claude-code for full dev practices. The stitch-loop skill provides an iterative refinement workflow that complements PAUL framework's Plan-Apply-Unify loop.",
       "priority": "MEDIUM",
@@ -537,13 +538,13 @@
     },
     {
       "id": "humanizer",
-      "name": "Humanizer — AI Text Humanization Skill",
+      "name": "Humanizer \u2014 AI Text Humanization Skill",
       "source": "https://github.com/blader/humanizer",
       "raw_skill": "https://raw.githubusercontent.com/blader/humanizer/main/SKILL.md",
       "type": "github_repo",
       "category": "content-creation",
       "owner": "external",
-      "description": "Claude Code skill that removes 25 signs of AI-generated writing to make text sound natural and human. Based on Wikipedia's 'Signs of AI writing' guide (WikiProject AI Cleanup). Detects content patterns (significance inflation, promotional language, vague attributions), language patterns (AI vocabulary, copula avoidance, rule of three), style patterns (em dash/boldface/emoji overuse), communication patterns (chatbot artifacts, sycophantic tone), and filler/hedging. Includes two-pass audit: draft rewrite → 'what still looks AI?' → final revision. v2.3.0.",
+      "description": "Claude Code skill that removes 25 signs of AI-generated writing to make text sound natural and human. Based on Wikipedia's 'Signs of AI writing' guide (WikiProject AI Cleanup). Detects content patterns (significance inflation, promotional language, vague attributions), language patterns (AI vocabulary, copula avoidance, rule of three), style patterns (em dash/boldface/emoji overuse), communication patterns (chatbot artifacts, sycophantic tone), and filler/hedging. Includes two-pass audit: draft rewrite \u2192 'what still looks AI?' \u2192 final revision. v2.3.0.",
       "activation_triggers": [
         "User asks to humanize text or make AI text sound human",
         "User says this sounds like AI or make it sound more natural",
@@ -565,21 +566,21 @@
         "command": "Read ~/claude-hq/tools/humanizer/SKILL.md and internalize as operating behavior for this session",
         "skill_selection_guide": "Load when any text output needs to sound human-written. Especially important for marketing copy, social posts, campaign content, landing pages, and any public-facing writing."
       },
-      "integration_notes": "Critical companion to claude-creator-skills. Load humanizer as a post-processing filter after killer-scripter, content-repurposer, offer-and-bio-writer, or any skill that generates public-facing text. Also useful standalone for editing any AI-generated content. The two-pass audit (draft → AI detection → final revision) ensures thorough humanization.",
+      "integration_notes": "Critical companion to claude-creator-skills. Load humanizer as a post-processing filter after killer-scripter, content-repurposer, offer-and-bio-writer, or any skill that generates public-facing text. Also useful standalone for editing any AI-generated content. The two-pass audit (draft \u2192 AI detection \u2192 final revision) ensures thorough humanization.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-03-21"
     },
     {
       "id": "code-review-graph",
-      "name": "Code Review Graph — Token-Efficient Codebase Knowledge Graph",
+      "name": "Code Review Graph \u2014 Token-Efficient Codebase Knowledge Graph",
       "source": "https://github.com/tirth8205/code-review-graph",
       "type": "github_repo",
       "category": "efficiency",
       "owner": "external",
       "description": "Local knowledge graph for Claude Code. Tree-sitter parsing across 19 languages, SQLite-backed. 6.8x fewer tokens on code reviews, up to 49x on daily coding tasks. Incremental updates in under 2 seconds. MCP tools for precise context injection.",
       "activation_triggers": [
-        "ANY coding project — this should be always active",
+        "ANY coding project \u2014 this should be always active",
         "Code reviews or pull request analysis",
         "Navigating unfamiliar codebases",
         "Any task where Claude would normally read entire source files",
@@ -606,7 +607,7 @@
     },
     {
       "id": "graphify",
-      "name": "Graphify — Multimodal Knowledge Graph Builder",
+      "name": "Graphify \u2014 Multimodal Knowledge Graph Builder",
       "source": "https://github.com/safishamsi/graphify",
       "type": "github_repo",
       "category": "knowledge",
@@ -641,7 +642,7 @@
     },
     {
       "id": "mempalace",
-      "name": "MemPalace — Verbatim AI Memory System",
+      "name": "MemPalace \u2014 Verbatim AI Memory System",
       "source": "https://github.com/milla-jovovich/mempalace",
       "type": "github_repo",
       "category": "memory",
@@ -673,12 +674,12 @@
     },
     {
       "id": "lightpanda",
-      "name": "Lightpanda — Headless Browser for AI Agents",
+      "name": "Lightpanda \u2014 Headless Browser for AI Agents",
       "source": "https://github.com/lightpanda-io/browser",
       "type": "github_repo",
       "category": "browser",
       "owner": "external",
-      "description": "Headless browser built from scratch in Zig for AI agents. 9x faster, 16x less memory than Chrome. CDP compatible with Playwright/Puppeteer. No visual rendering — optimised for data extraction, scraping, and DOM manipulation.",
+      "description": "Headless browser built from scratch in Zig for AI agents. 9x faster, 16x less memory than Chrome. CDP compatible with Playwright/Puppeteer. No visual rendering \u2014 optimised for data extraction, scraping, and DOM manipulation.",
       "activation_triggers": [
         "Web scraping or data extraction tasks",
         "Headless browsing where visual rendering is not needed",
@@ -688,7 +689,7 @@
       "anti_triggers": [
         "Tasks requiring screenshots or visual testing",
         "Complex SPAs that need full Chrome rendering",
-        "Tasks requiring visual interaction — use Playwright MCP instead"
+        "Tasks requiring visual interaction \u2014 use Playwright MCP instead"
       ],
       "cost_profile": {
         "type": "free",
@@ -706,7 +707,7 @@
     },
     {
       "id": "playwright-mcp",
-      "name": "Playwright MCP — Browser Automation with Visual Rendering",
+      "name": "Playwright MCP \u2014 Browser Automation with Visual Rendering",
       "source": "https://github.com/microsoft/playwright-mcp",
       "type": "mcp_server",
       "category": "browser",
@@ -720,7 +721,7 @@
         "Tasks where Lightpanda's no-render limitation is a problem"
       ],
       "anti_triggers": [
-        "Pure data extraction or scraping — use Lightpanda instead (faster)",
+        "Pure data extraction or scraping \u2014 use Lightpanda instead (faster)",
         "Tasks that don't need visual rendering"
       ],
       "cost_profile": {
@@ -739,7 +740,7 @@
     },
     {
       "id": "nano-banana-2",
-      "name": "Nano Banana 2 — AI Image Generation CLI",
+      "name": "Nano Banana 2 \u2014 AI Image Generation CLI",
       "source": "https://github.com/kingbootoshi/nano-banana-2-skill",
       "type": "github_repo",
       "category": "image-generation",
@@ -748,7 +749,7 @@
       "activation_triggers": [
         "Generate images for websites, apps, or content",
         "Create transparent assets (icons, logos, mascots)",
-        "UI design iterations — quickly generate design variations",
+        "UI design iterations \u2014 quickly generate design variations",
         "Thumbnails, social media graphics, hero images",
         "Style transfer or image editing",
         "User says generate an image or create a visual"
@@ -779,7 +780,7 @@
     },
     {
       "id": "ui-ux-pro-max",
-      "name": "UI/UX Pro Max — Design Intelligence Skill",
+      "name": "UI/UX Pro Max \u2014 Design Intelligence Skill",
       "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
       "type": "github_repo",
       "category": "design",
@@ -806,7 +807,7 @@
         "command": "/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill && /plugin install ui-ux-pro-max@ui-ux-pro-max-skill",
         "alternative": "npm install -g uipro-cli && uipro init --ai claude"
       },
-      "integration_notes": "The design brain — makes design decisions (style, colours, typography). Pair with SuperDesign (generates mockups) and emilkowalski/skill (animation quality). Pipeline: ui-ux-pro-max decides → SuperDesign visualises → emilkowalski polishes.",
+      "integration_notes": "The design brain \u2014 makes design decisions (style, colours, typography). Pair with SuperDesign (generates mockups) and emilkowalski/skill (animation quality). Pipeline: ui-ux-pro-max decides \u2192 SuperDesign visualises \u2192 emilkowalski polishes.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-04-11"
@@ -845,7 +846,7 @@
     },
     {
       "id": "superdesign",
-      "name": "SuperDesign — AI Design Agent + MCP Server",
+      "name": "SuperDesign \u2014 AI Design Agent + MCP Server",
       "source": "https://github.com/superdesigndev/superdesign",
       "type": "github_repo",
       "category": "design",
@@ -873,14 +874,14 @@
         "command": "Clone https://github.com/jonthebeef/superdesign-mcp-claude-code and configure as MCP server",
         "alternative": "Install VS Code extension from marketplace"
       },
-      "integration_notes": "Visual prototyping layer. Use before coding: SuperDesign generates mockup variants → user picks one → frontend agent implements it. Works best in the pipeline: ui-ux-pro-max (design system) → SuperDesign (mockups) → emilkowalski/skill (animations) → code.",
+      "integration_notes": "Visual prototyping layer. Use before coding: SuperDesign generates mockup variants \u2192 user picks one \u2192 frontend agent implements it. Works best in the pipeline: ui-ux-pro-max (design system) \u2192 SuperDesign (mockups) \u2192 emilkowalski/skill (animations) \u2192 code.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-04-11"
     },
     {
       "id": "open-montage",
-      "name": "OpenMontage — Agentic Video Production System",
+      "name": "OpenMontage \u2014 Agentic Video Production System",
       "source": "https://github.com/calesthio/OpenMontage",
       "type": "github_repo",
       "category": "video",
@@ -895,7 +896,7 @@
       ],
       "anti_triggers": [
         "Tasks with no video component",
-        "Simple image generation — use nano-banana-2 instead",
+        "Simple image generation \u2014 use nano-banana-2 instead",
         "Audio-only tasks"
       ],
       "cost_profile": {
@@ -909,14 +910,14 @@
         "method": "clone_and_run",
         "command": "git clone https://github.com/calesthio/OpenMontage.git ~/claude-hq/repos/open-montage"
       },
-      "integration_notes": "Full video production pipeline. Pairs naturally with creator skills: killer-scripter (writes script) → visual-storyteller (plans shots) → OpenMontage (produces video). Also uses Remotion (already registered) for composition.",
+      "integration_notes": "Full video production pipeline. Pairs naturally with creator skills: killer-scripter (writes script) \u2192 visual-storyteller (plans shots) \u2192 OpenMontage (produces video). Also uses Remotion (already registered) for composition.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-04-11"
     },
     {
       "id": "wan2gp",
-      "name": "Wan2GP — Local AI Video Generator (GPU Required)",
+      "name": "Wan2GP \u2014 Local AI Video Generator (GPU Required)",
       "source": "https://github.com/deepbeepmeep/Wan2GP",
       "type": "github_repo",
       "category": "video",
@@ -930,7 +931,7 @@
       "anti_triggers": [
         "No NVIDIA GPU available (Mac Apple Silicon)",
         "Tasks where stock footage or screen recording suffice",
-        "Simple editing tasks — use OpenMontage instead"
+        "Simple editing tasks \u2014 use OpenMontage instead"
       ],
       "cost_profile": {
         "type": "free",
@@ -946,19 +947,19 @@
           "conda"
         ]
       },
-      "integration_notes": "Backend video gen engine for OpenMontage when AI-generated clips are needed. CONDITIONAL — only register and activate if NVIDIA GPU hardware is confirmed available.",
+      "integration_notes": "Backend video gen engine for OpenMontage when AI-generated clips are needed. CONDITIONAL \u2014 only register and activate if NVIDIA GPU hardware is confirmed available.",
       "priority": "LOW",
       "status": "conditional",
       "added_date": "2026-04-11"
     },
     {
       "id": "agent-forge",
-      "name": "Agent Forge — Precision Agent Factory",
+      "name": "Agent Forge \u2014 Precision Agent Factory",
       "source": "local://Claude_Skills/agent-forge/",
       "type": "local_skill",
       "category": "orchestration",
       "owner": "SUNMANOFFICIAL189",
-      "description": "Meta-skill that produces precision-crafted autonomous agents using prompt-engineer methodology. 5-phase forge protocol: Define → Architect → Stress-Test → Produce → File. Outputs SKILL.md files into the Agent Bank with registry entries for Commander auto-discovery.",
+      "description": "Meta-skill that produces precision-crafted autonomous agents using prompt-engineer methodology. 5-phase forge protocol: Define \u2192 Architect \u2192 Stress-Test \u2192 Produce \u2192 File. Outputs SKILL.md files into the Agent Bank with registry entries for Commander auto-discovery.",
       "activation_triggers": [
         "User says forge an agent, create an agent, build me an agent for X",
         "Commander needs a specialized agent that doesn't exist in the agent bank",
@@ -966,25 +967,25 @@
         "Building a suite of agents for a multi-agent workflow"
       ],
       "anti_triggers": [
-        "Using an existing agent from the bank — just load it, don't re-forge",
+        "Using an existing agent from the bank \u2014 just load it, don't re-forge",
         "Quick one-off tasks that don't need a reusable agent",
-        "Modifying an existing agent — update its SKILL.md directly"
+        "Modifying an existing agent \u2014 update its SKILL.md directly"
       ],
       "dependencies": [
         "prompt-engineer"
       ],
       "setup_instructions": {
         "method": "read_skill_files",
-        "command": "Read ~/Claude_Skills/agent-forge/SKILL.md and ~/Claude_Skills/prompt-engineer/SKILL.md — both must be loaded for the forge to operate"
+        "command": "Read ~/Claude_Skills/agent-forge/SKILL.md and ~/Claude_Skills/prompt-engineer/SKILL.md \u2014 both must be loaded for the forge to operate"
       },
-      "integration_notes": "The agent factory. Depends on prompt-engineer for methodology. Outputs to ~/claude-hq/agents/ with registry entries. Commander scans the agent registry at task classification time to find matching agents. The forge only runs when a NEW agent is needed — existing agents are loaded directly.",
+      "integration_notes": "The agent factory. Depends on prompt-engineer for methodology. Outputs to ~/claude-hq/agents/ with registry entries. Commander scans the agent registry at task classification time to find matching agents. The forge only runs when a NEW agent is needed \u2014 existing agents are loaded directly.",
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-04-14"
     },
     {
       "id": "agent-bank",
-      "name": "Agent Bank — Precision Agent Registry",
+      "name": "Agent Bank \u2014 Precision Agent Registry",
       "source": "local://claude-hq/agents/",
       "type": "local_registry",
       "category": "orchestration",
@@ -992,21 +993,166 @@
       "description": "Registry of precision-crafted agents forged via Agent Forge. Commander reads ~/claude-hq/agents/registry.json at task classification time to find matching agents by activation triggers. Each agent is a self-contained SKILL.md.",
       "activation_triggers": [
         "ANY task that might have a matching specialized agent",
-        "Commander Step 2 (task classification) — always scan agent bank",
+        "Commander Step 2 (task classification) \u2014 always scan agent bank",
         "User says use my agents, check the agent bank, or which agents do I have"
       ],
       "anti_triggers": [
-        "Creating new agents — that's agent-forge, not agent-bank"
+        "Creating new agents \u2014 that's agent-forge, not agent-bank"
       ],
       "dependencies": [],
       "setup_instructions": {
         "method": "read_registry",
         "command": "Read ~/claude-hq/agents/registry.json and scan agents array for matching activation_triggers"
       },
-      "integration_notes": "Passive registry — Commander consults it during task classification. No setup needed. Agents are added by agent-forge. To use an agent: read its SKILL.md from the path in the registry entry.",
+      "integration_notes": "Passive registry \u2014 Commander consults it during task classification. No setup needed. Agents are added by agent-forge. To use an agent: read its SKILL.md from the path in the registry entry.",
       "priority": "ALWAYS",
       "status": "active",
       "added_date": "2026-04-14"
+    },
+    {
+      "id": "skills-sh",
+      "name": "skills.sh \u2014 The Open Agent Skills Ecosystem",
+      "source": "https://skills.sh/",
+      "cli": "npx skills <find|add> <args>",
+      "type": "marketplace",
+      "category": "discovery",
+      "owner": "external (vercel-labs)",
+      "description": "Marketplace of ~91,000 agent skills across 19+ AI coding agents. Skills are GitHub-packaged, searchable via `npx skills find`, installed via `npx skills add <owner/repo@skill>`. Known threat ecosystem: Snyk Feb 2026 found 13.4% of skills have critical issues; never install without the Trust Gate.",
+      "activation_triggers": [
+        "No matching tool in registry.json for the current task",
+        "User explicitly asks to search skills.sh",
+        "Commander Step 2.5 \u2014 skill discovery fallback"
+      ],
+      "anti_triggers": [
+        "Registry already has a matching tool (use it first)",
+        "Author is in INCIDENT_LEDGER cooling-off (blocked)",
+        "User invokes `npx skills add` directly (blocked by PreToolUse hook \u2014 route through /scout)"
+      ],
+      "dependencies": [
+        "magika",
+        "socket-cli",
+        "pip-audit",
+        "trust-gate-scripts"
+      ],
+      "setup_instructions": {
+        "method": "npx",
+        "command": "npx skills find <query> (no install \u2014 use /scout for gated install)"
+      },
+      "integration_notes": "Access ONLY through the /scout slash command. The Trust Gate PreToolUse hook blocks raw `npx skills add`. Skills.sh is itself owned by vercel-labs \u2014 see INCIDENT_LEDGER.md for cooling-off status. Tier C pipeline mandatory for every install regardless of install count.",
+      "priority": "MEDIUM",
+      "status": "active",
+      "added_date": "2026-04-21"
+    },
+    {
+      "id": "magika",
+      "name": "Magika \u2014 AI-Powered File Type Detection",
+      "source": "https://github.com/google/magika",
+      "cli": "magika [-r] [--json] <path>",
+      "type": "github_repo",
+      "category": "security",
+      "owner": "google",
+      "description": "Google's deep-learning file-type classifier. 99% accuracy, ~5ms per file, 200+ file types, Apache 2.0. Powers Layer 1 of the Trust Gate \u2014 catches extension-spoofed payloads in any external code. Used at Google for hundred-billions-of-files-per-week scale in Gmail/Drive/Safe Browsing.",
+      "activation_triggers": [
+        "Any external code clone or install (ambient via PreToolUse/PostToolUse hooks)",
+        "Historical audit via /skill-audit",
+        "Explicit `scripts/trust-gate-post.sh <dir>` for out-of-session clones"
+      ],
+      "anti_triggers": [
+        "Already-trusted files on the local filesystem you authored",
+        "Content-sensitive files where type is already known"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "brew",
+        "command": "brew install magika"
+      },
+      "integration_notes": "Layer 1 of the Trust Gate. Not a standalone security tool \u2014 paired with secret-scan (Layer 2), Socket (Layer 3), and reputation (Layer 4) for defence-in-depth. See commander/TRUST_GATE.md.",
+      "priority": "ALWAYS",
+      "status": "active",
+      "added_date": "2026-04-21"
+    },
+    {
+      "id": "socket-cli",
+      "name": "Socket CLI \u2014 Malicious Package Behaviour Detection",
+      "source": "https://socket.dev/",
+      "cli": "socket scan create <package-or-dir> --json",
+      "type": "cli_tool",
+      "category": "security",
+      "owner": "external (socket.dev)",
+      "description": "Behavioural scanner for npm packages \u2014 catches malicious behaviour (typosquatting, compromised maintainers, obfuscated code, unexpected network/shell activity). Free tier. Surfaced the Axios 4.2.1 compromise within 6 minutes of registry publish. Complements CVE scanners, does not replace them.",
+      "activation_triggers": [
+        "Tier C pipeline for any skill with package.json",
+        "Ambient Tier B when cloning anything with npm dependencies"
+      ],
+      "anti_triggers": [
+        "Python-only projects (use pip-audit instead)",
+        "Already-installed global packages (use `socket scan ~/.npm` if needed)"
+      ],
+      "dependencies": [
+        "node"
+      ],
+      "setup_instructions": {
+        "method": "npm",
+        "command": "npm install -g socket"
+      },
+      "integration_notes": "Layer 3 of the Trust Gate for npm. Paired with pip-audit for Python. Failure is fail-closed \u2014 if Socket scan errors, treat as block for safety.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-21"
+    },
+    {
+      "id": "pip-audit",
+      "name": "pip-audit \u2014 Python Dependency CVE Scanner",
+      "source": "https://github.com/pypa/pip-audit",
+      "cli": "pip-audit -r requirements.txt --format json",
+      "type": "github_repo",
+      "category": "security",
+      "owner": "pypa",
+      "description": "PyPA's official audit tool. Scans requirements.txt / pyproject.toml against the Python Packaging Advisory Database and OSV. Catches known CVEs in Python dependencies \u2014 complements Socket (which catches malicious behaviour) by covering the CVE layer.",
+      "activation_triggers": [
+        "Tier C pipeline for any skill with requirements.txt or pyproject.toml",
+        "Any Python project being cloned or audited"
+      ],
+      "anti_triggers": [
+        "Non-Python projects"
+      ],
+      "dependencies": [
+        "python3"
+      ],
+      "setup_instructions": {
+        "method": "brew",
+        "command": "brew install pip-audit"
+      },
+      "integration_notes": "Layer 3 of the Trust Gate for Python. Paired with Socket for npm. CVE-based, so catches known vulns but not novel maliciousness (that's Socket's role).",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-21"
+    },
+    {
+      "id": "trailofbits-skills",
+      "name": "Trail of Bits \u2014 Claude Code Security Skills",
+      "source": "https://github.com/trailofbits/skills",
+      "type": "github_repo",
+      "category": "security",
+      "owner": "trailofbits",
+      "description": "Gold-standard security-focused Claude Code skills from Trail of Bits \u2014 one of the most respected security research firms. Covers security research, vulnerability detection, and audit workflows. Reference implementation for high-trust skill authoring.",
+      "activation_triggers": [
+        "User requests security review, vulnerability scan, or threat modelling",
+        "Commander classifies task as security-sensitive",
+        "Reference implementation lookup for skill authoring"
+      ],
+      "anti_triggers": [
+        "Non-security tasks where generic skills suffice"
+      ],
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "trust_gate",
+        "command": "scripts/skill-install.sh trailofbits/skills@<skill-name> --scope global"
+      },
+      "integration_notes": "Trusted by allowlist. Still runs through full file-content scan on install. First repo installed via the Trust Gate at HQ v2 rollout \u2014 validates pipeline on known-good input.",
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-04-21"
     }
   ],
   "skills": [
@@ -1093,7 +1239,7 @@
     },
     {
       "id": "humanizer-skill",
-      "name": "Humanizer — AI Text Humanization",
+      "name": "Humanizer \u2014 AI Text Humanization",
       "source_tool": "humanizer",
       "file": "SKILL.md",
       "type": "skill_file",
@@ -1164,7 +1310,7 @@
     },
     {
       "id": "seed-to-paul-pipeline",
-      "name": "SEED → PAUL Ideation-to-Build Pipeline",
+      "name": "SEED \u2192 PAUL Ideation-to-Build Pipeline",
       "description": "Complete idea-to-build pipeline. SEED guides ideation and produces a structured PLANNING.md, then PAUL picks it up for managed build execution. Use when starting a new project from an idea.",
       "tools": [
         "seed",
@@ -1189,8 +1335,8 @@
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning)",
         "3. Activate claude-mem",
-        "4. Run /seed — guided ideation produces PLANNING.md",
-        "5. Run /seed launch — graduates plan + headless PAUL init",
+        "4. Run /seed \u2014 guided ideation produces PLANNING.md",
+        "5. Run /seed launch \u2014 graduates plan + headless PAUL init",
         "6. Load everything-claude-code practices",
         "7. Begin PAUL Plan-Apply-Unify loop from PLANNING.md"
       ],
@@ -1220,7 +1366,7 @@
         "1. Apply TECCP skill",
         "2. Activate recall-stack (session state + behavioral learning)",
         "3. Activate claude-mem",
-        "4. (Optional) Run SEED first if requirements unclear — /seed produces PLANNING.md",
+        "4. (Optional) Run SEED first if requirements unclear \u2014 /seed produces PLANNING.md",
         "5. Install paul-framework",
         "6. Load everything-claude-code practices",
         "7. Run /paul:init (reads PLANNING.md if SEED was used)",
@@ -1296,7 +1442,7 @@
         "1. Identify where user is in the creator pipeline",
         "2. Load brand-voice-guardian if voice card exists (persistent filter)",
         "3. Load the specific skill(s) matching the user's intent",
-        "4. For full pipeline: research → voice → ideation → script → visual → repurpose → offer → debrief",
+        "4. For full pipeline: research \u2192 voice \u2192 ideation \u2192 script \u2192 visual \u2192 repurpose \u2192 offer \u2192 debrief",
         "5. Run humanizer as post-processing filter on all public-facing text output",
         "6. Deliver action-ready output in the skill's defined format"
       ],
@@ -1465,7 +1611,7 @@
         "6. Load visual-storyteller (plan visual direction)",
         "7. Use nano-banana-2 for AI-generated visuals",
         "8. Activate OpenMontage for video content",
-        "9. Load content-repurposer (one piece → 10-15 platform pieces)",
+        "9. Load content-repurposer (one piece \u2192 10-15 platform pieces)",
         "10. Load offer-and-bio-writer (conversion copy)",
         "11. Run humanizer on ALL public-facing text",
         "12. Schedule performance-debriefer for post-launch analysis"
