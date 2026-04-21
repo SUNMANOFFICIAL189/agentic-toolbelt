@@ -15,6 +15,11 @@ rooms:
   keywords:
   - commander
   - commander
+- name: agents
+  description: Files from agents/
+  keywords:
+  - agents
+  - agents
 - name: recipes
   description: Files from recipes/
   keywords:
@@ -25,6 +30,11 @@ rooms:
   keywords:
   - templates
   - templates
+- name: commands
+  description: Files from commands/
+  keywords:
+  - commands
+  - commands
 - name: general
   description: Files that don't fit other rooms
   keywords: []

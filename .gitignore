@@ -29,3 +29,6 @@ __pycache__/
 .remotion/
 .stitch-skills/
 .superpowers/
+# Generated knowledge graph artefacts — canonical home is the Obsidian vault
+# (/Users/sunil_rajput/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/claude-hq/Graph/)
+graphify-out/
