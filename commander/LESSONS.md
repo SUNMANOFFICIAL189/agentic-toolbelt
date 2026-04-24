@@ -167,6 +167,38 @@
   don't; the source is already markdown and Obsidian-native. Write a
   wikilink from the Hub pointing at the source.
 
+### 14. Plaintext-secret config files are landmines — read them only via redirected tools
+- **Rule:** If a file is known to contain plaintext secrets (`claude_desktop_config.json`,
+  `.env`, credentials registries), never surface its contents directly through the `Read`
+  tool. Route secrets via scripts that touch them in-memory only and write to a secure
+  store (macOS Keychain, a gitignored mode-600 file). If a `Read` is unavoidable for
+  structural inspection, pair it with an immediate scrub + acknowledge the secondary
+  leak into session transcripts and claude-mem.
+- **Why:** 2026-04-21 → 2026-04-22 — reading `claude_desktop_config.json` to diagnose
+  why the Reddit MCP wasn't available surfaced 4 live secrets (Anthropic, Gemini,
+  GitHub, Reddit client secret) into tool output, which flowed into claude-mem
+  observations (1 row) and 8 local session transcripts before we caught it. Sunil
+  opted against rotation, so we migrated to Keychain + launchers + session-end
+  scrubber. The local leak was fully scrubbable; the Anthropic-backend leak is not.
+- **How to apply:** When an MCP/credential question forces config inspection, prefer
+  `security find-generic-password`, `env | grep`, or a helper script that reads the
+  config, stores in Keychain, and rewrites the file — all in one pass with no stdout
+  echo of values. The one-pass migration script is at
+  `~/claude-hq/scripts/mcp-migrate-to-keychain.sh`. Session-end scrubber is at
+  `~/claude-hq/scripts/lib/secret-scrub.sh`. Both are idempotent.
+
+### 15. macOS Keychain + launcher scripts is the right home for MCP secrets
+- **Rule:** Any MCP that needs an API key, token, or client secret must be launched
+  via a script in `~/claude-hq/scripts/mcp-launchers/` that fetches the secret from
+  Keychain at spawn time. The Claude Desktop config references the launcher path;
+  the config's `env: {}` block stays empty (or contains only public identifiers like
+  OAuth client IDs).
+- **Why:** Desktop config sits at a known path, is world-readable by anything with
+  your user permissions, and gets read by skills/agents for diagnostics. Keychain
+  entries are encrypted at rest and require your login. Launchers keep the spawn
+  command short and the config clean.
+- **How to apply:** New MCP with a secret → (1) `security add-generic-password -U -a "$USER" -s "claude-mcp-<name>" -w <value>`; (2) copy an existing launcher from `~/claude-hq/scripts/mcp-launchers/`, adapt the service name and exec line; (3) update `claude_desktop_config.json` to point to the launcher with `env: {}`; (4) restart Claude Desktop.
+
 ### 13. `.gitignore` patterns with `/` are anchored to the gitignore's location
 - **Rule:** In a multi-level repo (where the `.gitignore` sits above
   the actual content dir), patterns like `.obsidian/workspace.json`
@@ -180,3 +212,34 @@
 - **How to apply:** If your repo root is one level above the actual
   content, prefix subdirectory-anchored patterns with `**/`. Test:
   `git check-ignore -v <file>` should report the matching pattern.
+
+### 16. All user-facing alerts must be in plain English — no jargon, ever
+- **Rule:** Any system built under the HQ umbrella that sends messages to
+  Sunil (Telegram, email, push, SMS, anything) MUST describe what happened
+  and what to do in natural language a non-technical reader can understand
+  at a glance. Technical detail stays in logs, SQLite, or audit files —
+  it never reaches the phone. This applies to every alerting system, not
+  just Watchdog.
+- **Why:** 2026-04-24 — while building the HQ Watchdog, Sunil explicitly
+  asked to hardwire this constraint because technical alerts force a
+  context switch: read jargon → decode it → figure out what to do. That
+  defeats the point of an alert. The Polymarket Telegram pipe already
+  follows this pattern (short, readable status messages). HQ alerts must
+  match. Without code-level enforcement, every alert author (human or
+  agent) will slowly drift toward technical shorthand.
+- **How to apply:** When any new alerting path is built:
+  1. Every outgoing message goes through a `PlainAlert` (or equivalent)
+     with two REQUIRED fields: `what_happened` (plain English) and
+     `what_to_do` (one concrete action).
+  2. A jargon-linter must block banned words at construction time —
+     `threshold`, `regression`, `baseline`, `delta`, `rolling`, `stdev`,
+     `p-value`, `FP/TP`, unit shorthand (`7d`, `24h`), raw metric IDs, etc.
+  3. Metric definitions (yaml/json) must carry a `plain_language` block
+     with `what_it_means`, `why_it_matters`, `alert_template`. No metric
+     loads without it.
+  4. The template enforces the three-part shape: emoji headline →
+     what happened (1-3 plain sentences) → one clear "What to do: …".
+  5. Reference implementation lives at `~/claude-hq/watchdog/telegram.py`
+     (`PlainAlert` dataclass) and `watchdog/STYLE_GUIDE.md` (banned-word
+     list + template examples). Copy this pattern when building the next
+     alerting system.

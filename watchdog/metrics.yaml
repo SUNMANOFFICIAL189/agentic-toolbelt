@@ -1,0 +1,212 @@
+# HQ Watchdog — Metric Definitions
+#
+# Every metric MUST include:
+#   - id, category, source, measure (technical side)
+#   - plain_language.what_it_means     (one sentence, no jargon)
+#   - plain_language.why_it_matters    (one sentence, no jargon)
+#   - plain_language.alert_template    (template, no jargon, {var} allowed)
+#
+# A metric without a complete plain_language block will FAIL to load.
+# The watchdog refuses to start if any metric is missing these fields.
+#
+# Editing this file: safe. Add/remove/tune freely. Watchdog hot-reloads on
+# next run. Breaking changes (renamed fields) may require clearing baseline.json.
+
+version: 1.0.0
+
+# -----------------------------------------------------------------------------
+# CATEGORY 1 — Cognitive load (is Commander making YOU work harder?)
+# -----------------------------------------------------------------------------
+
+- id: user_corrections_per_session
+  category: cognitive_load
+  source: session_log
+  measure: count_of_correction_phrases
+  correction_patterns:
+    - "\\bno\\b.{0,20}(don't|dont|stop|wrong)"
+    - "\\bactually\\b"
+    - "\\bthat's wrong\\b"
+    - "\\bstop\\b"
+    - "\\bdon't\\s+(do|run|use)"
+    - "\\bundo\\b"
+  severity:
+    critical_when: "correction in last 3 messages of session"
+    warn_when: "more than 50% above the recent normal"
+  plain_language:
+    what_it_means: "How often you had to correct or stop Commander during a session"
+    why_it_matters: "If you're correcting more than usual, Commander is drifting or misunderstanding you"
+    alert_template: |
+      🤔 Commander's been needing more corrections lately
+
+      Over the last few sessions you've had to stop or redirect it more often than usual. Something has changed — either an instruction is being misread, or a recent update has made it less aligned with how you work.
+
+      What to do: reply "show" and I'll pull the last 3 sessions so we can see where the misreads happened.
+
+- id: messages_per_completed_task
+  category: cognitive_load
+  source: session_log
+  measure: your_turns_divided_by_tasks_completed
+  severity:
+    warn_when: "more than 30% above the recent normal"
+  plain_language:
+    what_it_means: "How many messages you have to send to get one task finished"
+    why_it_matters: "More messages per task means more hand-holding — Commander should get there faster on its own"
+    alert_template: |
+      💬 You're sending more messages per task than usual
+
+      It's taking about {percent_more}% more back-and-forth to get a typical task done. That usually points to Commander needing clearer instructions upfront or losing track mid-task.
+
+      What to do: reply "recent" and I'll show which type of task is costing the most messages.
+
+- id: lessons_rule_velocity
+  category: cognitive_load
+  source: git_log
+  measure: new_lines_in_commander_LESSONS_md_per_week
+  severity:
+    critical_when: "more than 2 new rules in 24 hours"
+    warn_when: "more than 3 new rules in 7 days"
+  plain_language:
+    what_it_means: "How often Commander has been learning from mistakes recently"
+    why_it_matters: "A burst of new rules means a burst of new mistakes. Slow-and-steady is healthy; sudden spikes are not"
+    alert_template: |
+      📚 Commander's been making a lot of new mistakes
+
+      In the last {window}, {count} new rules got added to the lessons file. That's a spike — either a recent change introduced bugs, or something in the way we're working has shifted.
+
+      What to do: reply "rules" and I'll list the new rules so we can see what's going wrong.
+
+- id: repeated_mistake_signal
+  category: cognitive_load
+  source: git_log
+  measure: LESSONS_rules_touching_similar_topics_within_14_days
+  severity:
+    critical_when: "any repeat within 14 days"
+  plain_language:
+    what_it_means: "Commander made the same kind of mistake twice despite having learned about it"
+    why_it_matters: "Repeats mean the lesson didn't stick — either the rule is weak or it's not being read at the right moment"
+    alert_template: |
+      🔁 Commander just repeated a mistake it should have learned from
+
+      Two recent lessons cover almost the same problem. That means the previous lesson didn't actually prevent it from happening again.
+
+      What to do: reply "rules" and I'll show both lessons side by side — we may need to strengthen or move one of them.
+
+# -----------------------------------------------------------------------------
+# CATEGORY 2 — Cost & efficiency (is it getting more expensive?)
+# -----------------------------------------------------------------------------
+
+- id: tokens_per_task
+  category: cost_efficiency
+  source: session_log
+  measure: total_tokens_divided_by_tasks_completed
+  severity:
+    warn_when: "more than 30% above the recent normal"
+  plain_language:
+    what_it_means: "How much thinking Commander needs to finish one task"
+    why_it_matters: "A sudden jump usually means Commander is going in circles or re-reading things it already knows"
+    alert_template: |
+      💸 Tasks are costing more thinking than usual
+
+      Typical tasks this week are using about {percent_more}% more thinking than the recent norm. Work is still getting done, just the long way round.
+
+      What to do: reply "trace" and I'll pull the slowest session to see where the extra thinking went.
+
+- id: subagents_per_task
+  category: cost_efficiency
+  source: session_log
+  measure: agent_tool_calls_divided_by_tasks_completed
+  severity:
+    warn_when: "more than 50% above the recent normal"
+  plain_language:
+    what_it_means: "How many helper agents Commander calls in to finish a task"
+    why_it_matters: "A jump usually means Commander is struggling and throwing more bodies at the problem instead of planning better"
+    alert_template: |
+      🧑‍🤝‍🧑 Commander is pulling in more helpers than usual
+
+      In recent sessions it's been calling roughly {percent_more}% more helper agents per task. Sometimes that's fine (complex task), sometimes it's thrashing (bad plan).
+
+      What to do: reply "look" and I'll check the last 3 sessions and tell you which it is.
+
+- id: session_duration_to_first_commit
+  category: cost_efficiency
+  source: session_log_plus_git
+  measure: time_from_session_start_to_first_commit_in_minutes
+  severity:
+    warn_when: "more than 50% above the recent normal"
+  plain_language:
+    what_it_means: "How long it takes before Commander makes its first real change"
+    why_it_matters: "A longer runway usually means more planning ceremony and less actual progress"
+    alert_template: |
+      🐢 It's taking longer to get started
+
+      Recent sessions are spending about {percent_more}% more time in planning before the first real change lands. Could be healthy thoroughness, could be getting stuck.
+
+      What to do: reply "first" and I'll show what happened in the minutes before the first commit in the slowest session.
+
+# -----------------------------------------------------------------------------
+# CATEGORY 3 — Protocol fidelity (is Commander following its own rules?)
+# -----------------------------------------------------------------------------
+
+- id: mission_board_before_agents
+  category: protocol_fidelity
+  source: session_log
+  measure: mission_board_written_before_first_agent_call
+  severity:
+    critical_when: "agent spawned without mission board"
+  plain_language:
+    what_it_means: "Whether Commander wrote its plan before spawning helper agents"
+    why_it_matters: "Skipping the plan is Commander's #1 cause of drift — the Boris principle says plan first, always"
+    alert_template: |
+      ⚠️ Commander skipped writing a plan before spawning helpers
+
+      In a recent session, Commander jumped straight to calling helper agents without first writing the mission board. That's the rule it's supposed to follow every time.
+
+      What to do: reply "when" and I'll point to the session + the moment it skipped.
+
+- id: lessons_read_at_session_start
+  category: protocol_fidelity
+  source: session_log
+  measure: commander_read_LESSONS_md_within_first_10_tool_calls
+  severity:
+    warn_when: "missed in more than 1 of last 5 sessions"
+  plain_language:
+    what_it_means: "Whether Commander reads its own lessons file at the start of a session"
+    why_it_matters: "If it doesn't load past mistakes, it will repeat them. Session-start review is the cheapest quality gate"
+    alert_template: |
+      📖 Commander's been skipping the lessons file at startup
+
+      In {missed_count} of the last {total_count} sessions, Commander didn't read its lessons file before starting work. That's how past mistakes come back.
+
+      What to do: reply "fix" and I'll add a stronger trigger to the startup protocol.
+
+- id: trust_gate_overrides
+  category: protocol_fidelity
+  source: trust_gate_log
+  measure: count_of_HQ_TRUST_OVERRIDE_usages
+  severity:
+    critical_when: "any unexpected override used"
+  plain_language:
+    what_it_means: "Whether the supply-chain security layer was bypassed"
+    why_it_matters: "Overrides should be rare and deliberate — a bypass you weren't expecting is a red flag"
+    alert_template: |
+      🚨 The security gate was just bypassed
+
+      Commander used the override to skip the Trust Gate about {minutes_ago} minutes ago. That's the layer that checks outside code before letting it in. It should only be used deliberately.
+
+      What to do: reply "why" and I'll pull up exactly what command was run and the context.
+
+- id: git_revert_on_claude_hq
+  category: protocol_fidelity
+  source: git_log
+  measure: count_of_revert_commits_on_claude_hq
+  severity:
+    critical_when: "any revert commit lands on main"
+  plain_language:
+    what_it_means: "Whether we had to undo a change that was already committed to HQ"
+    why_it_matters: "Reverts on main mean something bad shipped and had to be rolled back — always worth understanding why"
+    alert_template: |
+      ⏪ A change to HQ had to be undone
+
+      A commit on the claude-hq repo was just reverted. That means something shipped that shouldn't have.
+
+      What to do: reply "what" and I'll show the original commit, the revert, and what the problem was.

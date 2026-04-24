@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# HQ Watchdog — post-commit hook for claude-hq
+#
+# Runs the scoring engine after every commit. Safe-by-default:
+#   - Never blocks or delays the commit (runs in background, detached)
+#   - Never fails the git operation (always exits 0)
+#   - Catches all errors and drops them to a log
+#
+# Installed by: watchdog/install-hooks.sh
+# Uninstalled by: watchdog/install-hooks.sh --uninstall
+set -u
+
+CLAUDE_HQ="$(cd "$(dirname "$0")/../.." && pwd)"
+WATCHDOG="${CLAUDE_HQ}/watchdog"
+LOG="${WATCHDOG}/hook.log"
+
+# Bail early if watchdog was disabled
+if [[ -f "${WATCHDOG}/.env" ]] && grep -q "^WATCHDOG_ENABLED=false" "${WATCHDOG}/.env" 2>/dev/null; then
+    exit 0
+fi
+
+# Detach to background so the commit completes immediately
+(
+    cd "${CLAUDE_HQ}" || exit 0
+    python3 "${WATCHDOG}/watchdog.py" --all \
+        >> "${LOG}" 2>&1 || true
+) >/dev/null 2>&1 &
+
+# Always succeed — the watchdog never blocks real work
+exit 0

@@ -1,0 +1,708 @@
+#!/usr/bin/env python3
+"""
+HQ Watchdog — scoring engine.
+
+Reads local data (session .tmp files, git log on claude-hq, LESSONS.md
+velocity, Trust Gate log), computes metrics defined in metrics.yaml,
+compares them against rolling baselines, and emits PlainAlerts through
+telegram.py when something has gotten worse.
+
+Zero API costs. No LLM calls. Stdlib only.
+
+Usage:
+    python3 watchdog.py              # single scoring pass (called by hooks)
+    python3 watchdog.py --digest     # assemble the daily digest
+    python3 watchdog.py --ingest     # parse session files + commits into DB
+    python3 watchdog.py --stats      # print raw stats (for debugging)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sqlite3
+import subprocess
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+
+# Local import — same directory
+sys.path.insert(0, str(Path(__file__).parent))
+from telegram import PlainAlert, send as send_telegram  # noqa: E402
+
+# -----------------------------------------------------------------------------
+# Paths and constants
+# -----------------------------------------------------------------------------
+
+WATCHDOG_DIR = Path(__file__).parent.resolve()
+CLAUDE_HQ = WATCHDOG_DIR.parent
+SESSIONS_DIR = Path.home() / ".claude" / "sessions"
+LESSONS_FILE = CLAUDE_HQ / "commander" / "LESSONS.md"
+TRUST_GATE_LOG = CLAUDE_HQ / "scripts" / ".trust-gate.log"
+METRICS_YAML = WATCHDOG_DIR / "metrics.yaml"
+HISTORY_DB = WATCHDOG_DIR / "history.db"
+LEARNINGS_MD = WATCHDOG_DIR / "LEARNINGS.md"
+BASELINE_JSON = WATCHDOG_DIR / "baseline.json"
+
+# Correction phrase patterns — spoken by the user, captured in session summaries
+CORRECTION_PATTERNS = [
+    re.compile(r"\bno\b[,.\s]{0,20}(don't|dont|stop|wrong|not)\b", re.IGNORECASE),
+    re.compile(r"\bactually\b", re.IGNORECASE),
+    re.compile(r"\bthat'?s wrong\b", re.IGNORECASE),
+    re.compile(r"\bstop\s+(doing|that)\b", re.IGNORECASE),
+    re.compile(r"\bdon'?t\s+(do|run|use|touch)\b", re.IGNORECASE),
+    re.compile(r"\bundo\b", re.IGNORECASE),
+    re.compile(r"\brevert\b", re.IGNORECASE),
+]
+
+
+# -----------------------------------------------------------------------------
+# Database
+# -----------------------------------------------------------------------------
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_file TEXT UNIQUE NOT NULL,
+    session_date TEXT NOT NULL,
+    project TEXT,
+    branch TEXT,
+    started_at TEXT,
+    last_updated_at TEXT,
+    user_messages INTEGER DEFAULT 0,
+    files_modified INTEGER DEFAULT 0,
+    tools_used INTEGER DEFAULT 0,
+    correction_count INTEGER DEFAULT 0,
+    duration_minutes INTEGER DEFAULT 0,
+    captured_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS commits (
+    sha TEXT PRIMARY KEY,
+    commit_date TEXT NOT NULL,
+    message TEXT,
+    files_changed INTEGER DEFAULT 0,
+    insertions INTEGER DEFAULT 0,
+    deletions INTEGER DEFAULT 0,
+    is_revert INTEGER DEFAULT 0,
+    touches_lessons INTEGER DEFAULT 0,
+    lessons_rules_added INTEGER DEFAULT 0,
+    captured_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    computed_at TEXT NOT NULL,
+    metric_id TEXT NOT NULL,
+    current_value REAL,
+    baseline_value REAL,
+    percent_delta REAL,
+    severity TEXT,
+    alert_sent INTEGER DEFAULT 0,
+    suppressed INTEGER DEFAULT 0,
+    suppression_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(session_date);
+CREATE INDEX IF NOT EXISTS idx_commits_date ON commits(commit_date);
+CREATE INDEX IF NOT EXISTS idx_scores_computed ON scores(computed_at);
+"""
+
+
+def db_connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(HISTORY_DB)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA)
+    return conn
+
+
+# -----------------------------------------------------------------------------
+# Session parsing
+# -----------------------------------------------------------------------------
+
+@dataclass
+class SessionSummary:
+    session_file: str
+    session_date: str
+    project: str
+    branch: str
+    started_at: str
+    last_updated_at: str
+    user_messages: int
+    files_modified: int
+    tools_used: int
+    correction_count: int
+    duration_minutes: int
+
+
+def parse_session_file(path: Path) -> Optional[SessionSummary]:
+    """Parse a session .tmp file. Returns None if unparseable."""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    def find(pattern: str, default: str = "") -> str:
+        m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        return m.group(1).strip() if m else default
+
+    session_date = find(r"\*\*Date:\*\*\s*(\S+)")
+    if not session_date:
+        return None
+
+    started = find(r"\*\*Started:\*\*\s*(\S+)")
+    last_updated = find(r"\*\*Last Updated:\*\*\s*(\S+)")
+    project = find(r"\*\*Project:\*\*\s*(.+)$")
+    branch = find(r"\*\*Branch:\*\*\s*(\S+)")
+
+    # Tasks section contains the user messages (one per dash-prefixed line)
+    user_msgs = _extract_section_items(text, "Tasks")
+    files = _extract_section_items(text, "Files Modified")
+    tools = _extract_section_items(text, "Tools Used")
+
+    # Correction count — scan user_msgs for correction patterns
+    correction_count = 0
+    for msg in user_msgs:
+        for pat in CORRECTION_PATTERNS:
+            if pat.search(msg):
+                correction_count += 1
+                break
+
+    duration_minutes = _compute_duration(session_date, started, last_updated)
+
+    return SessionSummary(
+        session_file=str(path),
+        session_date=session_date,
+        project=project,
+        branch=branch,
+        started_at=started,
+        last_updated_at=last_updated,
+        user_messages=len(user_msgs),
+        files_modified=len(files),
+        tools_used=len(tools) if tools else _count_tools_stats(text),
+        correction_count=correction_count,
+        duration_minutes=duration_minutes,
+    )
+
+
+def _extract_section_items(text: str, section: str) -> list[str]:
+    """Extract bullet items under a ### heading."""
+    pat = re.compile(
+        rf"###\s+{re.escape(section)}\s*\n(.*?)(?=\n###|\n##|\n<!--|$)",
+        re.DOTALL | re.IGNORECASE,
+    )
+    m = pat.search(text)
+    if not m:
+        return []
+    return [
+        line.lstrip("-* \t").strip()
+        for line in m.group(1).splitlines()
+        if line.lstrip().startswith("-") or line.lstrip().startswith("*")
+    ]
+
+
+def _count_tools_stats(text: str) -> int:
+    """Fallback: count 'Total user messages' or similar from Stats section."""
+    m = re.search(r"Total user messages:\s*(\d+)", text, re.IGNORECASE)
+    return int(m.group(1)) if m else 0
+
+
+def _compute_duration(session_date: str, started: str, last_updated: str) -> int:
+    """Rough session duration in minutes. 0 if unparseable."""
+    if not started or not last_updated:
+        return 0
+    try:
+        start = datetime.strptime(f"{session_date} {started}", "%Y-%m-%d %H:%M")
+        end = datetime.strptime(f"{session_date} {last_updated}", "%Y-%m-%d %H:%M")
+        delta = (end - start).total_seconds() / 60.0
+        return max(0, int(delta))
+    except ValueError:
+        return 0
+
+
+def ingest_sessions() -> int:
+    """Walk ~/.claude/sessions/ and upsert into DB. Returns count of new rows."""
+    if not SESSIONS_DIR.is_dir():
+        return 0
+
+    conn = db_connect()
+    new_count = 0
+    now = datetime.now().isoformat(timespec="seconds")
+    for path in sorted(SESSIONS_DIR.glob("*.tmp")):
+        summary = parse_session_file(path)
+        if not summary:
+            continue
+        existing = conn.execute(
+            "SELECT id FROM sessions WHERE session_file = ?", (summary.session_file,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """UPDATE sessions SET
+                    last_updated_at=?, user_messages=?, files_modified=?,
+                    tools_used=?, correction_count=?, duration_minutes=?,
+                    captured_at=?
+                   WHERE id=?""",
+                (
+                    summary.last_updated_at, summary.user_messages, summary.files_modified,
+                    summary.tools_used, summary.correction_count, summary.duration_minutes,
+                    now, existing["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO sessions (session_file, session_date, project, branch,
+                   started_at, last_updated_at, user_messages, files_modified,
+                   tools_used, correction_count, duration_minutes, captured_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    summary.session_file, summary.session_date, summary.project, summary.branch,
+                    summary.started_at, summary.last_updated_at, summary.user_messages,
+                    summary.files_modified, summary.tools_used, summary.correction_count,
+                    summary.duration_minutes, now,
+                ),
+            )
+            new_count += 1
+    conn.commit()
+    conn.close()
+    return new_count
+
+
+# -----------------------------------------------------------------------------
+# Git ingestion
+# -----------------------------------------------------------------------------
+
+def ingest_commits(days: int = 90) -> int:
+    """Pull recent commits from claude-hq into DB. Returns count of new rows."""
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(CLAUDE_HQ), "log",
+             f"--since={since}",
+             "--pretty=format:%H%x1f%cI%x1f%s",
+             "--numstat", "--no-merges"],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return 0
+
+    conn = db_connect()
+    new_count = 0
+    now = datetime.now().isoformat(timespec="seconds")
+
+    current: Optional[dict[str, Any]] = None
+    for line in out.stdout.splitlines():
+        if "\x1f" in line:
+            # Commit header
+            if current:
+                _upsert_commit(conn, current, now)
+            parts = line.split("\x1f")
+            if len(parts) != 3:
+                continue
+            sha, date, message = parts
+            current = {
+                "sha": sha, "date": date, "message": message,
+                "files_changed": 0, "insertions": 0, "deletions": 0,
+                "touches_lessons": 0, "lessons_rules_added": 0,
+            }
+        elif line.strip() and current:
+            # numstat line: "insertions<TAB>deletions<TAB>path"
+            parts = line.split("\t")
+            if len(parts) != 3:
+                continue
+            ins, dele, path = parts
+            try:
+                current["insertions"] += int(ins) if ins.isdigit() else 0
+                current["deletions"] += int(dele) if dele.isdigit() else 0
+            except ValueError:
+                pass
+            current["files_changed"] += 1
+            if "LESSONS.md" in path or "lessons.md" in path.lower():
+                current["touches_lessons"] = 1
+                current["lessons_rules_added"] = _count_new_rules_in_commit(
+                    current["sha"]
+                )
+
+    if current:
+        _upsert_commit(conn, current, now)
+
+    # Re-count based on existing rows (fresh insert doesn't mean new)
+    new_count = conn.execute(
+        "SELECT COUNT(*) FROM commits WHERE captured_at = ?", (now,)
+    ).fetchone()[0]
+
+    conn.commit()
+    conn.close()
+    return new_count
+
+
+def _upsert_commit(conn: sqlite3.Connection, c: dict[str, Any], now: str) -> None:
+    is_revert = 1 if c["message"].lower().startswith(("revert ", "revert:")) else 0
+    conn.execute(
+        """INSERT OR REPLACE INTO commits
+           (sha, commit_date, message, files_changed, insertions, deletions,
+            is_revert, touches_lessons, lessons_rules_added, captured_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (
+            c["sha"], c["date"], c["message"],
+            c["files_changed"], c["insertions"], c["deletions"],
+            is_revert, c["touches_lessons"], c["lessons_rules_added"], now,
+        ),
+    )
+
+
+def _count_new_rules_in_commit(sha: str) -> int:
+    """Count how many new rule headings landed in LESSONS.md for this commit."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(CLAUDE_HQ), "show", f"{sha}", "--", "commander/LESSONS.md"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except subprocess.SubprocessError:
+        return 0
+    # Count '+### ' lines (new rule headings)
+    return sum(
+        1 for line in out.stdout.splitlines()
+        if line.startswith("+### ") and not line.startswith("+++")
+    )
+
+
+# -----------------------------------------------------------------------------
+# Metric computation
+# -----------------------------------------------------------------------------
+
+def compute_metric_values() -> dict[str, dict[str, float]]:
+    """Return {metric_id: {current, baseline, percent_delta}} for all metrics."""
+    conn = db_connect()
+    results: dict[str, dict[str, float]] = {}
+
+    # Cognitive load
+    results["user_corrections_per_session"] = _compute_with_baseline(
+        conn, "AVG(correction_count)", "sessions",
+        recent_days=3, baseline_days=14,
+    )
+    results["messages_per_completed_task"] = _compute_with_baseline(
+        conn, "AVG(user_messages * 1.0 / NULLIF(files_modified, 0))", "sessions",
+        recent_days=3, baseline_days=14, where="files_modified > 0",
+    )
+    results["lessons_rule_velocity"] = _compute_rule_velocity(conn)
+
+    # Cost / efficiency
+    results["subagents_per_task"] = _compute_with_baseline(
+        conn, "AVG(tools_used * 1.0 / NULLIF(files_modified, 0))", "sessions",
+        recent_days=3, baseline_days=14, where="files_modified > 0",
+    )
+    results["session_duration_to_first_commit"] = _compute_with_baseline(
+        conn, "AVG(duration_minutes)", "sessions",
+        recent_days=3, baseline_days=14, where="duration_minutes > 0",
+    )
+
+    # Protocol fidelity (binary signals)
+    results["git_revert_on_claude_hq"] = _compute_revert_flag(conn)
+    results["trust_gate_overrides"] = _compute_trust_gate_overrides()
+
+    conn.close()
+    return results
+
+
+def _compute_with_baseline(
+    conn: sqlite3.Connection,
+    agg_expr: str,
+    table: str,
+    recent_days: int,
+    baseline_days: int,
+    where: str = "1=1",
+) -> dict[str, float]:
+    cutoff_recent = (datetime.now() - timedelta(days=recent_days)).strftime("%Y-%m-%d")
+    cutoff_baseline_start = (datetime.now() - timedelta(days=baseline_days)).strftime("%Y-%m-%d")
+
+    current_row = conn.execute(
+        f"SELECT {agg_expr} AS val FROM {table} "
+        f"WHERE session_date >= ? AND {where}",
+        (cutoff_recent,),
+    ).fetchone()
+    current = float(current_row["val"]) if current_row and current_row["val"] else 0.0
+
+    baseline_row = conn.execute(
+        f"SELECT {agg_expr} AS val FROM {table} "
+        f"WHERE session_date >= ? AND session_date < ? AND {where}",
+        (cutoff_baseline_start, cutoff_recent),
+    ).fetchone()
+    baseline = float(baseline_row["val"]) if baseline_row and baseline_row["val"] else 0.0
+
+    pct_delta = ((current - baseline) / baseline * 100.0) if baseline > 0 else 0.0
+    return {"current": current, "baseline": baseline, "percent_delta": pct_delta}
+
+
+def _compute_rule_velocity(conn: sqlite3.Connection) -> dict[str, float]:
+    cutoff_7d = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    cutoff_24h = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    rules_7d = conn.execute(
+        "SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits WHERE commit_date >= ?",
+        (cutoff_7d,),
+    ).fetchone()["n"]
+    rules_24h = conn.execute(
+        "SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits WHERE commit_date >= ?",
+        (cutoff_24h,),
+    ).fetchone()["n"]
+    return {
+        "current": float(rules_24h),
+        "baseline": float(rules_7d) / 7.0,
+        "percent_delta": 0.0,
+        "rules_24h": float(rules_24h),
+        "rules_7d": float(rules_7d),
+    }
+
+
+def _compute_revert_flag(conn: sqlite3.Connection) -> dict[str, float]:
+    cutoff_24h = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    n = conn.execute(
+        "SELECT COUNT(*) AS n FROM commits WHERE commit_date >= ? AND is_revert=1",
+        (cutoff_24h,),
+    ).fetchone()["n"]
+    return {"current": float(n), "baseline": 0.0, "percent_delta": 0.0}
+
+
+def _compute_trust_gate_overrides() -> dict[str, float]:
+    if not TRUST_GATE_LOG.is_file():
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0}
+    try:
+        text = TRUST_GATE_LOG.read_text()
+    except OSError:
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0}
+    count_24h = 0
+    cutoff = datetime.now() - timedelta(days=1)
+    for line in text.splitlines():
+        if "HQ_TRUST_OVERRIDE" not in line:
+            continue
+        m = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", line)
+        if m:
+            try:
+                when = datetime.fromisoformat(m.group(1))
+                if when >= cutoff:
+                    count_24h += 1
+            except ValueError:
+                pass
+    return {"current": float(count_24h), "baseline": 0.0, "percent_delta": 0.0}
+
+
+# -----------------------------------------------------------------------------
+# Alert generation
+# -----------------------------------------------------------------------------
+
+def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
+    """Compute metrics, check against rules, send alerts. Returns summary."""
+    conn = db_connect()
+    total_sessions = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
+    conn.close()
+
+    values = compute_metric_values()
+    outcomes = []
+
+    for metric_id, vals in values.items():
+        outcome = {"metric": metric_id, "value": vals, "action": "none", "reason": ""}
+
+        # Critical flags — always alert, even in warmup
+        if metric_id == "git_revert_on_claude_hq" and vals["current"] > 0:
+            alert = _build_alert(metric_id, vals, severity="critical")
+            result = send_telegram(alert)
+            outcome["action"] = "sent" if result["ok"] else "failed"
+            outcome["reason"] = f"revert on claude-hq ({int(vals['current'])} commits)"
+            outcomes.append(outcome)
+            continue
+
+        if metric_id == "trust_gate_overrides" and vals["current"] > 0:
+            alert = _build_alert(metric_id, vals, severity="critical")
+            result = send_telegram(alert)
+            outcome["action"] = "sent" if result["ok"] else "failed"
+            outcome["reason"] = f"trust gate override used ({int(vals['current'])}x)"
+            outcomes.append(outcome)
+            continue
+
+        if metric_id == "lessons_rule_velocity":
+            if vals.get("rules_24h", 0) > 2:
+                alert = _build_alert(metric_id, vals, severity="critical",
+                                     extra={"count": int(vals["rules_24h"]), "window": "day"})
+                result = send_telegram(alert)
+                outcome["action"] = "sent" if result["ok"] else "failed"
+                outcome["reason"] = f"rules added in 24h: {int(vals['rules_24h'])}"
+                outcomes.append(outcome)
+                continue
+            if vals.get("rules_7d", 0) > 3:
+                alert = _build_alert(metric_id, vals, severity="warn",
+                                     extra={"count": int(vals["rules_7d"]), "window": "week"})
+                result = send_telegram(alert)
+                outcome["action"] = "sent" if result["ok"] else "failed"
+                outcome["reason"] = f"rules added in 7d: {int(vals['rules_7d'])}"
+                outcomes.append(outcome)
+                continue
+
+        # Warn — only after warmup period
+        if total_sessions < warmup_sessions:
+            outcome["action"] = "warmup"
+            outcome["reason"] = f"only {total_sessions}/{warmup_sessions} sessions captured"
+            outcomes.append(outcome)
+            continue
+
+        pct = vals.get("percent_delta", 0.0)
+        warn_threshold = {
+            "subagents_per_task": 50,
+            "tokens_per_task": 30,
+            "user_corrections_per_session": 50,
+            "messages_per_completed_task": 30,
+            "session_duration_to_first_commit": 50,
+        }.get(metric_id)
+        if warn_threshold and pct > warn_threshold:
+            alert = _build_alert(metric_id, vals, severity="warn",
+                                 extra={"percent_more": int(pct)})
+            result = send_telegram(alert)
+            outcome["action"] = "sent" if result["ok"] else "failed"
+            outcome["reason"] = f"up {int(pct)}% vs recent normal"
+            outcomes.append(outcome)
+            continue
+
+        outcome["action"] = "quiet"
+        outcomes.append(outcome)
+
+    return outcomes
+
+
+def _build_alert(
+    metric_id: str,
+    vals: dict[str, float],
+    severity: str,
+    extra: Optional[dict[str, Any]] = None,
+) -> PlainAlert:
+    """Construct a PlainAlert from metrics.yaml templates. Zero jargon allowed."""
+    extra = extra or {}
+    template_map = _load_alert_templates()
+    tpl = template_map.get(metric_id)
+    if not tpl:
+        # Generic fallback — still plain English
+        return PlainAlert(
+            what_happened=(
+                f"A quality signal has shifted in the HQ system. "
+                f"Something in how Commander is working has changed."
+            ),
+            what_to_do="reply \"look\" and I'll investigate the last few sessions.",
+            severity=severity,
+        )
+
+    # Render template with safe defaults
+    context = {
+        "percent_more": int(abs(vals.get("percent_delta", 0))),
+        "count": int(vals.get("current", 0)),
+        "window": "recently",
+        "missed_count": int(vals.get("current", 0)),
+        "total_count": 5,
+        "minutes_ago": 0,
+        **extra,
+    }
+    try:
+        rendered = tpl.format(**context)
+    except (KeyError, IndexError):
+        rendered = tpl  # Fall back to template literal if substitution fails
+
+    # Split into what_happened and what_to_do based on "What to do:" marker
+    what_happened, _, what_to_do = rendered.partition("What to do:")
+    if not what_to_do:
+        what_happened, what_to_do = rendered, "reply \"look\" and I'll investigate."
+
+    return PlainAlert(
+        what_happened=what_happened.strip(),
+        what_to_do=what_to_do.strip(),
+        severity=severity,
+    )
+
+
+def _load_alert_templates() -> dict[str, str]:
+    """Load alert_template strings from metrics.yaml (minimal YAML parsing)."""
+    if not METRICS_YAML.is_file():
+        return {}
+    text = METRICS_YAML.read_text()
+    templates: dict[str, str] = {}
+    current_id: Optional[str] = None
+    collecting_template = False
+    buffer: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- id:"):
+            if current_id and buffer:
+                templates[current_id] = "\n".join(buffer).strip()
+            current_id = stripped.split(":", 1)[1].strip()
+            buffer = []
+            collecting_template = False
+        elif "alert_template:" in stripped and "|" in stripped:
+            collecting_template = True
+            buffer = []
+        elif collecting_template:
+            if line and not line.startswith(" " * 6):
+                # End of block
+                collecting_template = False
+                if current_id:
+                    templates[current_id] = "\n".join(buffer).strip()
+                buffer = []
+            else:
+                buffer.append(line.strip())
+
+    if current_id and buffer and collecting_template:
+        templates[current_id] = "\n".join(buffer).strip()
+
+    return templates
+
+
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="HQ Watchdog scoring engine")
+    parser.add_argument("--ingest", action="store_true", help="Parse sessions + git log into DB")
+    parser.add_argument("--stats", action="store_true", help="Print raw stats")
+    parser.add_argument("--assess", action="store_true", help="Compute metrics + send alerts if needed")
+    parser.add_argument("--digest", action="store_true", help="Send the daily digest")
+    parser.add_argument("--all", action="store_true", help="Shortcut for --ingest + --assess")
+    args = parser.parse_args()
+
+    ran_something = False
+
+    if args.ingest or args.all:
+        ran_something = True
+        n_sessions = ingest_sessions()
+        n_commits = ingest_commits()
+        print(f"ingested: {n_sessions} new sessions, commits table refreshed ({n_commits} rows touched)")
+
+    if args.stats:
+        ran_something = True
+        conn = db_connect()
+        total = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
+        commits = conn.execute("SELECT COUNT(*) AS n FROM commits").fetchone()["n"]
+        conn.close()
+        print(f"sessions in db: {total}")
+        print(f"commits in db:  {commits}")
+        print("metric snapshot:")
+        for metric, vals in compute_metric_values().items():
+            print(f"  {metric}: {json.dumps(vals, default=float)}")
+
+    if args.assess or args.all:
+        ran_something = True
+        outcomes = assess_and_alert()
+        for o in outcomes:
+            print(f"  [{o['action']:7}] {o['metric']}: {o['reason']}")
+
+    if args.digest:
+        ran_something = True
+        # Placeholder: daily digest sender (implemented in evolve.py)
+        print("digest: use evolve.py --daily for now")
+
+    if not ran_something:
+        parser.print_help()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
