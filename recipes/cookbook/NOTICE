@@ -1,0 +1,39 @@
+Claude HQ Recipe Cookbook
+Copyright (c) 2026 Sunil Rajput
+
+This directory contains adaptations of workflow recipes from the Goose
+project (https://github.com/aaif-goose/goose), which is published by
+the Agentic AI Foundation at the Linux Foundation under the Apache
+License, Version 2.0.
+
+-------------------------------------------------------------------------
+
+Original works adapted:
+  - rpi-research.yaml
+  - rpi-plan.yaml
+  - rpi-implement.yaml
+  - rpi-iterate.yaml
+  Authored by: angiejones (contact listed in the original YAML)
+
+Original licence:
+  Apache License, Version 2.0
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Copies of the originals are fetched from the Goose repository and
+can be retrieved via:
+
+  gh api repos/aaif-goose/goose/contents/documentation/src/pages/recipes/data/recipes/<recipe>.yaml
+
+The adaptations in this repository are derivative works that translate
+the recipes from Goose's YAML/Jinja2 workflow format into Claude Code
+slash commands. Structural changes include:
+
+  - Replacement of Goose 'subrecipes' with Claude Code subagent calls
+  - Replacement of Jinja2 templating with slash-command $ARGUMENTS
+  - Integration with Claude HQ Commander protocol references
+  - Removal of Goose-specific extension configuration blocks
+
+The Apache 2.0 licence requires: (a) attribution, (b) a copy of the
+licence, (c) clear marking of modifications. This NOTICE file and the
+README in this directory provide (a) and (c); the full licence text
+is available at the URL above.

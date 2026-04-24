@@ -1247,6 +1247,92 @@
       "priority": "HIGH"
     }
   ],
+  "recipes": [
+    {
+      "id": "rpi-research",
+      "name": "RPI Research",
+      "description": "Stage 1 of the RPI pipeline \u2014 structured codebase research using parallel subagents. Produces a dated research doc in thoughts/research/.",
+      "slash_command": "/rpi-research",
+      "file": ".claude/commands/rpi-research.md",
+      "stage": 1,
+      "pairs_with": ["rpi-plan"],
+      "source": {
+        "project": "aaif-goose/goose",
+        "license": "Apache-2.0",
+        "original": "documentation/src/pages/recipes/data/recipes/rpi-research.yaml",
+        "ported_on": "2026-04-24"
+      },
+      "activation_triggers": [
+        "Research the codebase for X",
+        "Document how X works before we change it",
+        "Explore the X subsystem",
+        "Before planning a change to X, understand what's there"
+      ]
+    },
+    {
+      "id": "rpi-plan",
+      "name": "RPI Plan",
+      "description": "Stage 2 of the RPI pipeline \u2014 turn research and context into a detailed phased implementation plan. Produces a dated plan doc in thoughts/plans/.",
+      "slash_command": "/rpi-plan",
+      "file": ".claude/commands/rpi-plan.md",
+      "stage": 2,
+      "pairs_with": ["rpi-research", "rpi-implement"],
+      "source": {
+        "project": "aaif-goose/goose",
+        "license": "Apache-2.0",
+        "original": "documentation/src/pages/recipes/data/recipes/rpi-plan.yaml",
+        "ported_on": "2026-04-24"
+      },
+      "activation_triggers": [
+        "Create a plan to implement X",
+        "Write an implementation plan for X",
+        "Plan out the phases for X before building",
+        "Turn this PRD into a phased plan"
+      ]
+    },
+    {
+      "id": "rpi-implement",
+      "name": "RPI Implement",
+      "description": "Stage 3 of the RPI pipeline \u2014 execute an approved plan phase by phase with verification pauses between phases.",
+      "slash_command": "/rpi-implement",
+      "file": ".claude/commands/rpi-implement.md",
+      "stage": 3,
+      "pairs_with": ["rpi-plan", "rpi-iterate"],
+      "source": {
+        "project": "aaif-goose/goose",
+        "license": "Apache-2.0",
+        "original": "documentation/src/pages/recipes/data/recipes/rpi-implement.yaml",
+        "ported_on": "2026-04-24"
+      },
+      "activation_triggers": [
+        "Execute the plan at <path>",
+        "Implement this plan",
+        "Start building from <plan path>",
+        "Run phase N of the plan at <path>"
+      ]
+    },
+    {
+      "id": "rpi-iterate",
+      "name": "RPI Iterate",
+      "description": "Stage 4 of the RPI pipeline \u2014 surgically update an existing plan based on feedback, with fresh research only when required.",
+      "slash_command": "/rpi-iterate",
+      "file": ".claude/commands/rpi-iterate.md",
+      "stage": 4,
+      "pairs_with": ["rpi-plan", "rpi-implement"],
+      "source": {
+        "project": "aaif-goose/goose",
+        "license": "Apache-2.0",
+        "original": "documentation/src/pages/recipes/data/recipes/rpi-iterate.yaml",
+        "ported_on": "2026-04-24"
+      },
+      "activation_triggers": [
+        "Update the plan at <path> to include X",
+        "Revise the plan at <path>",
+        "Change phase N of <plan>",
+        "Iterate on <plan path> based on this feedback"
+      ]
+    }
+  ],
   "tool_combinations": [
     {
       "id": "prd-full-build",
