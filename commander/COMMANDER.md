@@ -85,6 +85,20 @@ STEP 2: CLASSIFY TASK
 ├── How complex? (single-agent / multi-agent / swarm)
 ├── What domains? (frontend / backend / design / content / data / video / etc.)
 ├── What tools in registry match? (scan activation_triggers)
+├── RECIPE DETECTION (new): check registry.json "recipes" section for match
+│   ├── For each recipe, test the task description against its activation_triggers
+│   ├── Match rules:
+│   │   ├── Keyword match: does the task text contain the trigger's key phrases?
+│   │   ├── Intent match: does the task's verb/shape match (research / plan / implement / iterate)?
+│   │   └── Explicit path reference: does the task mention a path matching rpi-implement / rpi-iterate?
+│   ├── If one or more recipes match:
+│   │   ├── Rank by trigger_priority (lower = stronger, 1 beats 2)
+│   │   ├── Surface the top match in the plan under "Proposed recipe"
+│   │   ├── Example line: "Proposed recipe: /rpi-plan (matched trigger: 'Create a plan to implement X')"
+│   │   └── WAIT for user confirmation — "rpi" to use the recipe, "freehand" to skip,
+│   │       "describe more" to give additional context first
+│   ├── NEVER auto-invoke a recipe without explicit approval — Rule 17 in LESSONS.md
+│   └── If no match → continue to tool_combination check below
 ├── What tool_combination fits? (check predefined stacks)
 ├── AGENT BANK SCAN: Check agents/registry.json for matching agents
 │   ├── Match task against agent activation_triggers

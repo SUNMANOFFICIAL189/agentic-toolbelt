@@ -243,3 +243,36 @@
      (`PlainAlert` dataclass) and `watchdog/STYLE_GUIDE.md` (banned-word
      list + template examples). Copy this pattern when building the next
      alerting system.
+
+### 17. When recipes match, propose — never auto-invoke without explicit approval
+- **Rule:** When Commander's Step 2 RECIPE DETECTION matches a task against
+  one or more recipes in `registry.json`, surface the top-ranked recipe as
+  a *proposal* in the MISSION_BOARD and wait for an explicit user reply
+  ("rpi" to use, "freehand" to skip, "describe more" to add context)
+  before invoking it. Do not silently run the recipe as part of plan
+  execution. This applies to all recipe families, not just the current
+  RPI set.
+- **Why:** 2026-04-24 — during the Goose recipes pilot, Sunil and I
+  considered three paths for automating `/rpi-*` dispatch: (A) full auto
+  (Commander picks + runs), (B) suggest and confirm, (C) merge RPI into
+  Commander's default protocol. Path A was rejected because it destroys
+  the pilot's measurement integrity — the watchdog can only score
+  "with recipe vs without" if there are sessions of each kind, and
+  auto-invocation removes the control group. Path C was rejected as
+  premature; we haven't proven RPI is better than Commander's current
+  protocol and merging conflates experiment with tool. Path B preserves
+  the choice point, which is the only way to get a clean evidence loop.
+- **How to apply:**
+  1. In `commander/COMMANDER.md` Step 2 RECIPE DETECTION, the final
+     branch **must** be "WAIT for user confirmation" — not "invoke".
+  2. When the proposal is shown, include the matched trigger phrase so
+     the user can judge whether the match was correct.
+  3. If multiple recipes match with equal strength, use `trigger_priority`
+     (lower = stronger) from `registry.json` as the tiebreaker. If still
+     tied, surface all tied recipes to the user, don't silently pick.
+  4. This rule can be revisited *only* when the watchdog has at least 3
+     weeks of pilot data showing a recipe family produces consistently
+     better outcomes than freehand. Until then, the proposal gate stays.
+  5. The same principle applies if and when we add new recipe families
+     (security-audit, full-stack-initializer, clean-up-feature-flag,
+     etc.) — the default is always propose-and-confirm, never auto-run.

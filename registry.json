@@ -1255,6 +1255,7 @@
       "slash_command": "/rpi-research",
       "file": ".claude/commands/rpi-research.md",
       "stage": 1,
+      "trigger_priority": 1,
       "pairs_with": ["rpi-plan"],
       "source": {
         "project": "aaif-goose/goose",
@@ -1276,6 +1277,7 @@
       "slash_command": "/rpi-plan",
       "file": ".claude/commands/rpi-plan.md",
       "stage": 2,
+      "trigger_priority": 2,
       "pairs_with": ["rpi-research", "rpi-implement"],
       "source": {
         "project": "aaif-goose/goose",
@@ -1297,6 +1299,7 @@
       "slash_command": "/rpi-implement",
       "file": ".claude/commands/rpi-implement.md",
       "stage": 3,
+      "trigger_priority": 3,
       "pairs_with": ["rpi-plan", "rpi-iterate"],
       "source": {
         "project": "aaif-goose/goose",
@@ -1318,6 +1321,7 @@
       "slash_command": "/rpi-iterate",
       "file": ".claude/commands/rpi-iterate.md",
       "stage": 4,
+      "trigger_priority": 4,
       "pairs_with": ["rpi-plan", "rpi-implement"],
       "source": {
         "project": "aaif-goose/goose",
