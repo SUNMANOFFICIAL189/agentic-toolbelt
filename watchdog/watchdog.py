@@ -522,8 +522,11 @@ def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
             continue
 
         if metric_id == "lessons_rule_velocity":
+            # Rule-bursts are a "heads up", never a "something went wrong".
+            # Kept as warn even at the higher threshold. Critical is reserved
+            # for reverts, trust-gate overrides, and repeat-mistake signals.
             if vals.get("rules_24h", 0) > 2:
-                alert = _build_alert(metric_id, vals, severity="critical",
+                alert = _build_alert(metric_id, vals, severity="warn",
                                      extra={"count": int(vals["rules_24h"]), "window": "day"})
                 result = send_telegram(alert)
                 outcome["action"] = "sent" if result["ok"] else "failed"
@@ -569,6 +572,21 @@ def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
     return outcomes
 
 
+METRIC_EMOJI = {
+    "user_corrections_per_session": "💬",
+    "messages_per_completed_task": "💬",
+    "lessons_rule_velocity": "📚",
+    "repeated_mistake_signal": "🔁",
+    "tokens_per_task": "💸",
+    "subagents_per_task": "🧑‍🤝‍🧑",
+    "session_duration_to_first_commit": "🐢",
+    "mission_board_before_agents": "⚠️",
+    "lessons_read_at_session_start": "📖",
+    "trust_gate_overrides": "🚨",
+    "git_revert_on_claude_hq": "⏪",
+}
+
+
 def _build_alert(
     metric_id: str,
     vals: dict[str, float],
@@ -577,17 +595,22 @@ def _build_alert(
 ) -> PlainAlert:
     """Construct a PlainAlert from metrics.yaml templates. Zero jargon allowed."""
     extra = extra or {}
+    emoji = METRIC_EMOJI.get(metric_id, "")
     template_map = _load_alert_templates()
     tpl = template_map.get(metric_id)
     if not tpl:
-        # Generic fallback — still plain English
+        # Generic fallback — still plain English, no broken-promise reply prompt
         return PlainAlert(
             what_happened=(
-                f"A quality signal has shifted in the HQ system. "
-                f"Something in how Commander is working has changed."
+                "A quality signal has shifted in the HQ system. "
+                "Something in how Commander is working has changed."
             ),
-            what_to_do="reply \"look\" and I'll investigate the last few sessions.",
+            what_to_do=(
+                "If you want to investigate, run: "
+                "python3 ~/claude-hq/watchdog/watchdog.py --sessions"
+            ),
             severity=severity,
+            headline_emoji=emoji,
         )
 
     # Render template with safe defaults
@@ -608,13 +631,41 @@ def _build_alert(
     # Split into what_happened and what_to_do based on "What to do:" marker
     what_happened, _, what_to_do = rendered.partition("What to do:")
     if not what_to_do:
-        what_happened, what_to_do = rendered, "reply \"look\" and I'll investigate."
+        what_happened = rendered
+        what_to_do = (
+            "If you want details, run: "
+            "python3 ~/claude-hq/watchdog/watchdog.py --sessions"
+        )
 
     return PlainAlert(
-        what_happened=what_happened.strip(),
+        what_happened=_strip_leading_emoji(what_happened.strip()),
         what_to_do=what_to_do.strip(),
         severity=severity,
+        headline_emoji=emoji,
     )
+
+
+def _strip_leading_emoji(text: str) -> str:
+    """Remove leading emoji + whitespace so the alert doesn't double-emoji.
+
+    Templates historically led with an emoji (e.g. '📚 Commander ...') and the
+    header also had an emoji, producing visual clutter. We now put the emoji
+    on the headline only; template bodies are plain text.
+    """
+    # Simple heuristic: if the first line looks like "<emoji> Title\n\nBody",
+    # drop everything up to the first blank line.
+    lines = text.splitlines()
+    if not lines:
+        return text
+    first = lines[0].strip()
+    # If first "line" is short and contains a non-ASCII emoji char, drop it
+    if len(first) < 80 and any(ord(c) > 0x2600 for c in first):
+        # Drop first line + any blank lines that follow
+        idx = 1
+        while idx < len(lines) and not lines[idx].strip():
+            idx += 1
+        return "\n".join(lines[idx:]).strip()
+    return text
 
 
 def _load_alert_templates() -> dict[str, str]:
@@ -658,6 +709,149 @@ def _load_alert_templates() -> dict[str, str]:
 # CLI
 # -----------------------------------------------------------------------------
 
+def cli_rules(days: int = 7) -> None:
+    """List LESSONS.md rule additions in the last N days. Run after a rule-burst alert."""
+    _ingest_if_stale()
+    conn = db_connect()
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    rows = conn.execute(
+        """SELECT sha, commit_date, message, lessons_rules_added
+           FROM commits WHERE commit_date >= ? AND touches_lessons=1 AND lessons_rules_added > 0
+           ORDER BY commit_date DESC""",
+        (since,),
+    ).fetchall()
+    conn.close()
+
+    print(f"LESSONS.md updates in the last {days} days:")
+    print()
+    total = 0
+    for r in rows:
+        print(f"  {r['commit_date'][:10]}  +{r['lessons_rules_added']} rule(s)  {r['sha'][:8]}")
+        print(f"                {r['message'][:100]}")
+        print()
+        total += r["lessons_rules_added"]
+    print(f"Total new rules in the last {days} days: {total}")
+
+    if LESSONS_FILE.is_file():
+        text = LESSONS_FILE.read_text()
+        titles = re.findall(r"^### (.+)$", text, re.MULTILINE)
+        print()
+        print(f"All rule titles currently in LESSONS.md ({len(titles)} total):")
+        for t in titles[-10:]:
+            print(f"  • {t}")
+
+
+def cli_sessions(limit: int = 10) -> None:
+    """Show the most recent sessions with key numbers. Run after any alert about sessions."""
+    _ingest_if_stale()
+    conn = db_connect()
+    rows = conn.execute(
+        """SELECT session_date, project, branch, user_messages, files_modified,
+                  tools_used, correction_count, duration_minutes
+           FROM sessions ORDER BY session_date DESC, id DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+
+    print(f"Last {len(rows)} sessions:")
+    print()
+    print(f"  {'date':<11}  {'project':<25}  {'msgs':>5}  {'files':>6}  {'tools':>6}  {'corrs':>6}  {'mins':>5}")
+    print(f"  {'-'*11}  {'-'*25}  {'-'*5}  {'-'*6}  {'-'*6}  {'-'*6}  {'-'*5}")
+    for r in rows:
+        proj = (r["project"] or "?")[:25]
+        print(
+            f"  {r['session_date']:<11}  {proj:<25}  "
+            f"{r['user_messages']:>5}  {r['files_modified']:>6}  {r['tools_used']:>6}  "
+            f"{r['correction_count']:>6}  {r['duration_minutes']:>5}"
+        )
+    print()
+    print("  msgs = how many messages you sent     tools = how many tool calls Commander made")
+    print("  files = how many files got touched     corrs = times you pushed back / corrected")
+
+
+def cli_security(days: int = 30) -> None:
+    """Show recent Trust Gate overrides and any reverts on claude-hq."""
+    _ingest_if_stale()
+    conn = db_connect()
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    reverts = conn.execute(
+        """SELECT sha, commit_date, message FROM commits
+           WHERE commit_date >= ? AND is_revert=1
+           ORDER BY commit_date DESC""",
+        (since,),
+    ).fetchall()
+    conn.close()
+
+    print(f"Reverts on claude-hq in the last {days} days:")
+    if not reverts:
+        print("  (none)")
+    for r in reverts:
+        print(f"  {r['commit_date'][:10]}  {r['sha'][:8]}  {r['message'][:100]}")
+
+    print()
+    print("Trust Gate overrides in the last 30 days:")
+    if not TRUST_GATE_LOG.is_file():
+        print("  (no Trust Gate log file present)")
+        return
+    try:
+        text = TRUST_GATE_LOG.read_text()
+    except OSError:
+        print("  (could not read Trust Gate log)")
+        return
+    cutoff = datetime.now() - timedelta(days=days)
+    hits = 0
+    for line in text.splitlines():
+        if "HQ_TRUST_OVERRIDE" not in line:
+            continue
+        m = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", line)
+        if not m:
+            continue
+        try:
+            when = datetime.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if when >= cutoff:
+            hits += 1
+            print(f"  {line[:180]}")
+    if hits == 0:
+        print("  (none)")
+
+
+def cli_cost() -> None:
+    """Show cost / efficiency numbers across recent vs older sessions."""
+    _ingest_if_stale()
+    values = compute_metric_values()
+    print("Cost & efficiency snapshot")
+    print()
+    for key in ("tokens_per_task", "subagents_per_task", "messages_per_completed_task",
+                "session_duration_to_first_commit"):
+        v = values.get(key)
+        if not v:
+            continue
+        label = {
+            "tokens_per_task": "thinking per task",
+            "subagents_per_task": "helpers per task",
+            "messages_per_completed_task": "your messages per task",
+            "session_duration_to_first_commit": "minutes to first change",
+        }[key]
+        current = v.get("current", 0.0)
+        baseline = v.get("baseline", 0.0)
+        delta = v.get("percent_delta", 0.0)
+        direction = "↑" if delta > 0 else ("↓" if delta < 0 else "→")
+        print(f"  {label:<28}  recent: {current:>7.2f}   recent normal: {baseline:>7.2f}   {direction} {abs(delta):5.1f}%")
+
+
+def _ingest_if_stale(max_age_minutes: int = 30) -> None:
+    """Re-ingest sessions/commits if the DB hasn't been updated lately."""
+    if not HISTORY_DB.is_file():
+        ingest_sessions(); ingest_commits()
+        return
+    age_sec = (datetime.now() - datetime.fromtimestamp(HISTORY_DB.stat().st_mtime)).total_seconds()
+    if age_sec > max_age_minutes * 60:
+        ingest_sessions(); ingest_commits()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="HQ Watchdog scoring engine")
     parser.add_argument("--ingest", action="store_true", help="Parse sessions + git log into DB")
@@ -665,6 +859,10 @@ def main() -> int:
     parser.add_argument("--assess", action="store_true", help="Compute metrics + send alerts if needed")
     parser.add_argument("--digest", action="store_true", help="Send the daily digest")
     parser.add_argument("--all", action="store_true", help="Shortcut for --ingest + --assess")
+    parser.add_argument("--rules", action="store_true", help="List recent LESSONS.md rule additions")
+    parser.add_argument("--sessions", action="store_true", help="Show recent sessions with key numbers")
+    parser.add_argument("--security", action="store_true", help="Show recent reverts and Trust Gate overrides")
+    parser.add_argument("--cost", action="store_true", help="Show cost / efficiency snapshot")
     args = parser.parse_args()
 
     ran_something = False
@@ -697,6 +895,22 @@ def main() -> int:
         ran_something = True
         # Placeholder: daily digest sender (implemented in evolve.py)
         print("digest: use evolve.py --daily for now")
+
+    if args.rules:
+        ran_something = True
+        cli_rules()
+
+    if args.sessions:
+        ran_something = True
+        cli_sessions()
+
+    if args.security:
+        ran_something = True
+        cli_security()
+
+    if args.cost:
+        ran_something = True
+        cli_cost()
 
     if not ran_something:
         parser.print_help()

@@ -100,13 +100,16 @@ class PlainAlert:
         _lint_text(self.what_happened, field="what_happened")
         _lint_text(self.what_to_do, field="what_to_do")
 
-        if "reply" not in self.what_to_do.lower() and "do this:" not in self.what_to_do.lower():
-            # Soft-require an action. "Nothing to do right now" is also acceptable.
-            if "nothing to do" not in self.what_to_do.lower() and "no action" not in self.what_to_do.lower():
-                raise JargonError(
-                    "what_to_do must contain a concrete action "
-                    "('reply \"X\"', 'do this: ...') or explicitly say 'nothing to do'"
-                )
+        action_markers = (
+            "reply ", "run ", "run:", "open ", "do this:", "check ",
+            "nothing to do", "no action",
+        )
+        if not any(m in self.what_to_do.lower() for m in action_markers):
+            raise JargonError(
+                "what_to_do must contain a concrete action verb "
+                "(run/open/reply/check/do this:) or explicitly say 'nothing to do'. "
+                f"Got: {self.what_to_do[:80]!r}"
+            )
 
     def to_telegram_markdown(self) -> str:
         """Render to a Telegram-ready HTML string."""
