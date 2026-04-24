@@ -492,82 +492,195 @@ def _compute_trust_gate_overrides() -> dict[str, float]:
 # Alert generation
 # -----------------------------------------------------------------------------
 
+def _should_suppress(conn: sqlite3.Connection, metric_id: str, severity: str) -> tuple[bool, str]:
+    """Decide whether to suppress this alert based on history.
+
+    Rule: critical alerts ALWAYS fire (no cooldown, no de-dup).
+    Rule: warn alerts fire once per occurrence — once sent, stay silent until
+    the metric goes quiet (condition clears). When the condition returns
+    after a quiet period, the next alert fires.
+
+    This is edge-triggered de-duplication: you get one alert per "incident",
+    not one per assessment tick.
+
+    Returns (suppress_bool, reason_str).
+    """
+    if severity == "critical":
+        return False, ""
+
+    last_alert = conn.execute(
+        "SELECT MAX(computed_at) AS t FROM scores WHERE metric_id = ? AND alert_sent = 1",
+        (metric_id,),
+    ).fetchone()["t"]
+    if not last_alert:
+        return False, ""  # never alerted for this metric — fire
+
+    last_quiet = conn.execute(
+        "SELECT MAX(computed_at) AS t FROM scores "
+        "WHERE metric_id = ? AND alert_sent = 0 AND suppressed = 0",
+        (metric_id,),
+    ).fetchone()["t"]
+
+    if last_quiet and last_quiet > last_alert:
+        # Metric cleared between last alert and now — this is a new occurrence
+        return False, ""
+
+    return True, f"already alerted at {last_alert} and condition has not cleared since"
+
+
+def _record_score(
+    conn: sqlite3.Connection,
+    metric_id: str,
+    vals: dict[str, float],
+    severity: Optional[str],
+    alert_sent: bool,
+    suppressed: bool,
+    suppression_reason: str,
+) -> None:
+    """Persist the outcome of this assessment to the scores table."""
+    conn.execute(
+        """INSERT INTO scores
+           (computed_at, metric_id, current_value, baseline_value, percent_delta,
+            severity, alert_sent, suppressed, suppression_reason)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            datetime.now().isoformat(timespec="seconds"),
+            metric_id,
+            float(vals.get("current", 0.0)),
+            float(vals.get("baseline", 0.0)),
+            float(vals.get("percent_delta", 0.0)),
+            severity,
+            1 if alert_sent else 0,
+            1 if suppressed else 0,
+            suppression_reason,
+        ),
+    )
+    conn.commit()
+
+
+def _try_send(
+    conn: sqlite3.Connection,
+    metric_id: str,
+    vals: dict[str, float],
+    severity: str,
+    reason: str,
+    extra: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Send an alert if suppression allows, and record the outcome.
+
+    Critical severity always sends. Warn severity fires once per
+    occurrence (edge-triggered — sends only when the metric was quiet
+    between the last alert and now).
+    """
+    outcome: dict[str, Any] = {"metric": metric_id, "value": vals, "action": "none", "reason": reason}
+
+    suppress, suppress_reason = _should_suppress(conn, metric_id, severity)
+    if suppress:
+        _record_score(conn, metric_id, vals, severity,
+                      alert_sent=False, suppressed=True,
+                      suppression_reason=suppress_reason)
+        outcome["action"] = "suppressed"
+        outcome["reason"] = f"{reason} — {suppress_reason}"
+        return outcome
+
+    alert = _build_alert(metric_id, vals, severity=severity, extra=extra)
+    result = send_telegram(alert)
+    sent = bool(result.get("ok"))
+    _record_score(conn, metric_id, vals, severity,
+                  alert_sent=sent, suppressed=False, suppression_reason="")
+    outcome["action"] = "sent" if sent else "failed"
+    return outcome
+
+
+def _record_quiet(conn: sqlite3.Connection, metric_id: str, vals: dict[str, float]) -> None:
+    """Record a 'quiet' observation so edge-triggering knows the condition cleared."""
+    _record_score(conn, metric_id, vals, severity=None,
+                  alert_sent=False, suppressed=False, suppression_reason="")
+
+
 def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
-    """Compute metrics, check against rules, send alerts. Returns summary."""
+    """Compute metrics, check against rules, send alerts. Returns summary.
+
+    De-dup rules:
+      * critical severity always fires (reverts, trust-gate overrides, repeats)
+      * warn severity fires once per occurrence (edge-triggered via scores table)
+      * quiet observations are also recorded so re-occurrence can be detected
+    """
     conn = db_connect()
     total_sessions = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
-    conn.close()
 
     values = compute_metric_values()
     outcomes = []
 
-    for metric_id, vals in values.items():
-        outcome = {"metric": metric_id, "value": vals, "action": "none", "reason": ""}
+    try:
+        for metric_id, vals in values.items():
+            fired = False
 
-        # Critical flags — always alert, even in warmup
-        if metric_id == "git_revert_on_claude_hq" and vals["current"] > 0:
-            alert = _build_alert(metric_id, vals, severity="critical")
-            result = send_telegram(alert)
-            outcome["action"] = "sent" if result["ok"] else "failed"
-            outcome["reason"] = f"revert on claude-hq ({int(vals['current'])} commits)"
-            outcomes.append(outcome)
-            continue
+            # Critical flags — always alert, even in warmup
+            if metric_id == "git_revert_on_claude_hq" and vals["current"] > 0:
+                outcomes.append(_try_send(conn, metric_id, vals, "critical",
+                                          reason=f"revert on claude-hq ({int(vals['current'])} commits)"))
+                fired = True
 
-        if metric_id == "trust_gate_overrides" and vals["current"] > 0:
-            alert = _build_alert(metric_id, vals, severity="critical")
-            result = send_telegram(alert)
-            outcome["action"] = "sent" if result["ok"] else "failed"
-            outcome["reason"] = f"trust gate override used ({int(vals['current'])}x)"
-            outcomes.append(outcome)
-            continue
+            elif metric_id == "trust_gate_overrides" and vals["current"] > 0:
+                outcomes.append(_try_send(conn, metric_id, vals, "critical",
+                                          reason=f"trust gate override used ({int(vals['current'])}x)"))
+                fired = True
 
-        if metric_id == "lessons_rule_velocity":
-            # Rule-bursts are a "heads up", never a "something went wrong".
-            # Kept as warn even at the higher threshold. Critical is reserved
-            # for reverts, trust-gate overrides, and repeat-mistake signals.
-            if vals.get("rules_24h", 0) > 2:
-                alert = _build_alert(metric_id, vals, severity="warn",
-                                     extra={"count": int(vals["rules_24h"]), "window": "day"})
-                result = send_telegram(alert)
-                outcome["action"] = "sent" if result["ok"] else "failed"
-                outcome["reason"] = f"rules added in 24h: {int(vals['rules_24h'])}"
-                outcomes.append(outcome)
-                continue
-            if vals.get("rules_7d", 0) > 3:
-                alert = _build_alert(metric_id, vals, severity="warn",
-                                     extra={"count": int(vals["rules_7d"]), "window": "week"})
-                result = send_telegram(alert)
-                outcome["action"] = "sent" if result["ok"] else "failed"
-                outcome["reason"] = f"rules added in 7d: {int(vals['rules_7d'])}"
-                outcomes.append(outcome)
-                continue
+            elif metric_id == "lessons_rule_velocity":
+                # Rule-bursts are a "heads up", never a "something went wrong".
+                # Kept as warn even at the higher threshold.
+                if vals.get("rules_24h", 0) > 2:
+                    outcomes.append(_try_send(
+                        conn, metric_id, vals, "warn",
+                        reason=f"rules added in 24h: {int(vals['rules_24h'])}",
+                        extra={"count": int(vals["rules_24h"]), "window": "day"},
+                    ))
+                    fired = True
+                elif vals.get("rules_7d", 0) > 3:
+                    outcomes.append(_try_send(
+                        conn, metric_id, vals, "warn",
+                        reason=f"rules added in 7d: {int(vals['rules_7d'])}",
+                        extra={"count": int(vals["rules_7d"]), "window": "week"},
+                    ))
+                    fired = True
 
-        # Warn — only after warmup period
-        if total_sessions < warmup_sessions:
-            outcome["action"] = "warmup"
-            outcome["reason"] = f"only {total_sessions}/{warmup_sessions} sessions captured"
-            outcomes.append(outcome)
-            continue
+            # Warn — only after warmup period
+            elif total_sessions < warmup_sessions:
+                outcomes.append({
+                    "metric": metric_id, "value": vals,
+                    "action": "warmup",
+                    "reason": f"only {total_sessions}/{warmup_sessions} sessions captured",
+                })
+                fired = True
 
-        pct = vals.get("percent_delta", 0.0)
-        warn_threshold = {
-            "subagents_per_task": 50,
-            "tokens_per_task": 30,
-            "user_corrections_per_session": 50,
-            "messages_per_completed_task": 30,
-            "session_duration_to_first_commit": 50,
-        }.get(metric_id)
-        if warn_threshold and pct > warn_threshold:
-            alert = _build_alert(metric_id, vals, severity="warn",
-                                 extra={"percent_more": int(pct)})
-            result = send_telegram(alert)
-            outcome["action"] = "sent" if result["ok"] else "failed"
-            outcome["reason"] = f"up {int(pct)}% vs recent normal"
-            outcomes.append(outcome)
-            continue
+            else:
+                pct = vals.get("percent_delta", 0.0)
+                warn_threshold = {
+                    "subagents_per_task": 50,
+                    "tokens_per_task": 30,
+                    "user_corrections_per_session": 50,
+                    "messages_per_completed_task": 30,
+                    "session_duration_to_first_commit": 50,
+                }.get(metric_id)
+                if warn_threshold and pct > warn_threshold:
+                    outcomes.append(_try_send(
+                        conn, metric_id, vals, "warn",
+                        reason=f"up {int(pct)}% vs recent normal",
+                        extra={"percent_more": int(pct)},
+                    ))
+                    fired = True
 
-        outcome["action"] = "quiet"
-        outcomes.append(outcome)
+            if not fired:
+                # Metric is within normal range — record as quiet so re-occurrence
+                # can be detected by edge-triggered de-dup.
+                _record_quiet(conn, metric_id, vals)
+                outcomes.append({
+                    "metric": metric_id, "value": vals,
+                    "action": "quiet", "reason": "",
+                })
+    finally:
+        conn.close()
 
     return outcomes
 
