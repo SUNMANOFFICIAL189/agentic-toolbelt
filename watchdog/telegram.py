@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import subprocess
 import sys
 import urllib.error
@@ -26,6 +27,21 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """Create an SSL context that works on macOS stock Python.
+
+    Python's default cert path on macOS often points at a missing file
+    (/Library/Frameworks/Python.framework/.../etc/openssl/cert.pem). We
+    prefer the certifi bundle when available — it ships with most modern
+    Python distributions and contains the Mozilla CA set.
+    """
+    try:
+        import certifi  # type: ignore[import-not-found]
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
 
 # -----------------------------------------------------------------------------
 # Hardwired banned-word list (the jargon linter)
@@ -210,7 +226,8 @@ def send(alert: PlainAlert) -> dict:
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        ctx = _build_ssl_context()
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             if body.get("ok"):
                 return {"ok": True, "error": None}
