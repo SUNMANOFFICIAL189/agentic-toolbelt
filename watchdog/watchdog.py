@@ -900,8 +900,53 @@ def _load_alert_templates() -> dict[str, str]:
 # CLI
 # -----------------------------------------------------------------------------
 
-def cli_rules(days: int = 7) -> None:
-    """List LESSONS.md rule additions in the last N days. Run after a rule-burst alert."""
+# -----------------------------------------------------------------------------
+# Plain-language helpers — used by plain=True renderers
+# -----------------------------------------------------------------------------
+
+def _humanise_date(iso_date: str) -> str:
+    """Convert '2026-04-21' into 'today' / 'yesterday' / '3 days ago' / '21 Apr'."""
+    try:
+        d = datetime.strptime(iso_date[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return iso_date[:10]
+    today = datetime.now().date()
+    delta = (today - d).days
+    if delta == 0:
+        return "today"
+    if delta == 1:
+        return "yesterday"
+    if 2 <= delta <= 6:
+        return f"{delta} days ago"
+    return d.strftime("%-d %b")
+
+
+def _humanise_duration(minutes: int) -> str:
+    if minutes <= 0:
+        return "—"
+    if minutes < 60:
+        return f"{minutes} min"
+    hours = minutes // 60
+    mins = minutes % 60
+    if mins == 0:
+        return f"{hours} hr"
+    return f"{hours} hr {mins} min"
+
+
+def _humanise_message(text: str) -> str:
+    """Strip conventional-commit prefix so the message reads naturally."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"^(feat|fix|docs|chore|refactor|test|lessons?|style)(\([^)]+\))?:\s*", "", text)
+    return cleaned[:120]
+
+
+# -----------------------------------------------------------------------------
+# CLI commands — return strings; plain=True renders in conversational prose
+# -----------------------------------------------------------------------------
+
+def cli_rules(days: int = 7, plain: bool = False) -> str:
+    """Report recent LESSONS.md rule additions."""
     _ingest_if_stale()
     conn = db_connect()
     since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -912,28 +957,69 @@ def cli_rules(days: int = 7) -> None:
         (since,),
     ).fetchall()
     conn.close()
+    total = sum(r["lessons_rules_added"] for r in rows)
 
-    print(f"LESSONS.md updates in the last {days} days:")
-    print()
-    total = 0
-    for r in rows:
-        print(f"  {r['commit_date'][:10]}  +{r['lessons_rules_added']} rule(s)  {r['sha'][:8]}")
-        print(f"                {r['message'][:100]}")
-        print()
-        total += r["lessons_rules_added"]
-    print(f"Total new rules in the last {days} days: {total}")
-
+    titles: list[str] = []
     if LESSONS_FILE.is_file():
-        text = LESSONS_FILE.read_text()
-        titles = re.findall(r"^### (.+)$", text, re.MULTILINE)
-        print()
-        print(f"All rule titles currently in LESSONS.md ({len(titles)} total):")
+        titles = re.findall(r"^### (.+)$", LESSONS_FILE.read_text(), re.MULTILINE)
+
+    if plain:
+        return _render_rules_plain(rows, total, titles, days)
+    return _render_rules_terminal(rows, total, titles, days)
+
+
+def _render_rules_terminal(rows: list[Any], total: int, titles: list[str], days: int) -> str:
+    out: list[str] = [f"LESSONS.md updates in the last {days} days:", ""]
+    for r in rows:
+        out.append(f"  {r['commit_date'][:10]}  +{r['lessons_rules_added']} rule(s)  {r['sha'][:8]}")
+        out.append(f"                {r['message'][:100]}")
+        out.append("")
+    out.append(f"Total new rules in the last {days} days: {total}")
+    if titles:
+        out.append("")
+        out.append(f"All rule titles currently in LESSONS.md ({len(titles)} total):")
         for t in titles[-10:]:
-            print(f"  • {t}")
+            out.append(f"  • {t}")
+    return "\n".join(out)
 
 
-def cli_sessions(limit: int = 10) -> None:
-    """Show the most recent sessions with key numbers. Run after any alert about sessions."""
+def _render_rules_plain(rows: list[Any], total: int, titles: list[str], days: int) -> str:
+    lines: list[str] = []
+    if total == 0:
+        lines.append(f"No new lessons in the last {days} days. Commander has been running without needing to learn anything new.")
+        return "\n".join(lines)
+
+    if total == 1:
+        lines.append(f"One new lesson got added in the last {days} days.")
+    else:
+        lines.append(f"Commander has picked up {total} new lessons in the last {days} days.")
+
+    lines.append("")
+    lines.append("Here's when each batch came in:")
+    for r in rows:
+        when = _humanise_date(r["commit_date"])
+        n = r["lessons_rules_added"]
+        desc = _humanise_message(r["message"])
+        lines.append(f"• {when} — {n} new rule{'s' if n != 1 else ''} — {desc}")
+
+    if titles:
+        lines.append("")
+        lines.append("Most recent rule titles:")
+        for t in titles[-5:]:
+            # Strip the leading "N. " if present
+            clean = re.sub(r"^\d+\.\s*", "", t).strip()
+            lines.append(f"• {clean}")
+
+    lines.append("")
+    lines.append(
+        "Rough guide: if the lessons look like bugs being patched, something's going wrong. "
+        "If they look like deliberate system improvements, you're good."
+    )
+    return "\n".join(lines)
+
+
+def cli_sessions(limit: int = 10, plain: bool = False) -> str:
+    """Report on the most recent sessions."""
     _ingest_if_stale()
     conn = db_connect()
     rows = conn.execute(
@@ -943,29 +1029,61 @@ def cli_sessions(limit: int = 10) -> None:
         (limit,),
     ).fetchall()
     conn.close()
+    if plain:
+        return _render_sessions_plain(rows)
+    return _render_sessions_terminal(rows)
 
-    print(f"Last {len(rows)} sessions:")
-    print()
-    print(f"  {'date':<11}  {'project':<25}  {'msgs':>5}  {'files':>6}  {'tools':>6}  {'corrs':>6}  {'mins':>5}")
-    print(f"  {'-'*11}  {'-'*25}  {'-'*5}  {'-'*6}  {'-'*6}  {'-'*6}  {'-'*5}")
+
+def _render_sessions_terminal(rows: list[Any]) -> str:
+    out: list[str] = [f"Last {len(rows)} sessions:", ""]
+    out.append(f"  {'date':<11}  {'project':<25}  {'msgs':>5}  {'files':>6}  {'tools':>6}  {'corrs':>6}  {'mins':>5}")
+    out.append(f"  {'-'*11}  {'-'*25}  {'-'*5}  {'-'*6}  {'-'*6}  {'-'*6}  {'-'*5}")
     for r in rows:
         proj = (r["project"] or "?")[:25]
-        print(
+        out.append(
             f"  {r['session_date']:<11}  {proj:<25}  "
             f"{r['user_messages']:>5}  {r['files_modified']:>6}  {r['tools_used']:>6}  "
             f"{r['correction_count']:>6}  {r['duration_minutes']:>5}"
         )
-    print()
-    print("  msgs = how many messages you sent     tools = how many tool calls Commander made")
-    print("  files = how many files got touched     corrs = times you pushed back / corrected")
+    out.append("")
+    out.append("  msgs = how many messages you sent     tools = how many tool calls Commander made")
+    out.append("  files = how many files got touched     corrs = times you pushed back / corrected")
+    return "\n".join(out)
 
 
-def cli_security(days: int = 30) -> None:
-    """Show recent Trust Gate overrides and any reverts on claude-hq."""
+def _render_sessions_plain(rows: list[Any]) -> str:
+    if not rows:
+        return "No sessions recorded yet."
+    lines: list[str] = [f"Here are the last {len(rows)} sessions:", ""]
+    for r in rows:
+        when = _humanise_date(r["session_date"])
+        proj = (r["project"] or "?").strip()
+        msgs = r["user_messages"] or 0
+        files = r["files_modified"] or 0
+        corrs = r["correction_count"] or 0
+        mins = _humanise_duration(r["duration_minutes"] or 0)
+        corr_phrase = (
+            "no corrections from you"
+            if corrs == 0
+            else f"{corrs} correction{'s' if corrs != 1 else ''} from you"
+        )
+        files_phrase = (
+            "no file changes"
+            if files == 0
+            else f"{files} file{'s' if files != 1 else ''} changed"
+        )
+        lines.append(
+            f"• {when} — {proj} — {msgs} of your messages, "
+            f"{files_phrase}, {corr_phrase}, ran about {mins}."
+        )
+    return "\n".join(lines)
+
+
+def cli_security(days: int = 30, plain: bool = False) -> str:
+    """Report recent reverts + Trust Gate overrides."""
     _ingest_if_stale()
     conn = db_connect()
     since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-
     reverts = conn.execute(
         """SELECT sha, commit_date, message FROM commits
            WHERE commit_date >= ? AND is_revert=1
@@ -974,63 +1092,145 @@ def cli_security(days: int = 30) -> None:
     ).fetchall()
     conn.close()
 
-    print(f"Reverts on claude-hq in the last {days} days:")
-    if not reverts:
-        print("  (none)")
-    for r in reverts:
-        print(f"  {r['commit_date'][:10]}  {r['sha'][:8]}  {r['message'][:100]}")
-
-    print()
-    print("Trust Gate overrides in the last 30 days:")
-    if not TRUST_GATE_LOG.is_file():
-        print("  (no Trust Gate log file present)")
-        return
-    try:
-        text = TRUST_GATE_LOG.read_text()
-    except OSError:
-        print("  (could not read Trust Gate log)")
-        return
-    cutoff = datetime.now() - timedelta(days=days)
-    hits = 0
-    for line in text.splitlines():
-        if "HQ_TRUST_OVERRIDE" not in line:
-            continue
-        m = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", line)
-        if not m:
-            continue
+    overrides: list[str] = []
+    if TRUST_GATE_LOG.is_file():
         try:
-            when = datetime.fromisoformat(m.group(1))
-        except ValueError:
-            continue
-        if when >= cutoff:
-            hits += 1
-            print(f"  {line[:180]}")
-    if hits == 0:
-        print("  (none)")
+            text = TRUST_GATE_LOG.read_text()
+            cutoff = datetime.now() - timedelta(days=days)
+            for line in text.splitlines():
+                if "HQ_TRUST_OVERRIDE" not in line:
+                    continue
+                m = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", line)
+                if not m:
+                    continue
+                try:
+                    when = datetime.fromisoformat(m.group(1))
+                except ValueError:
+                    continue
+                if when >= cutoff:
+                    overrides.append(line[:180])
+        except OSError:
+            pass
+
+    if plain:
+        return _render_security_plain(reverts, overrides, days)
+    return _render_security_terminal(reverts, overrides, days)
 
 
-def cli_cost() -> None:
-    """Show cost / efficiency numbers across recent vs older sessions."""
+def _render_security_terminal(reverts: list[Any], overrides: list[str], days: int) -> str:
+    out: list[str] = [f"Reverts on claude-hq in the last {days} days:"]
+    if not reverts:
+        out.append("  (none)")
+    for r in reverts:
+        out.append(f"  {r['commit_date'][:10]}  {r['sha'][:8]}  {r['message'][:100]}")
+    out.append("")
+    out.append(f"Trust Gate overrides in the last {days} days:")
+    if not overrides:
+        out.append("  (none)")
+    for line in overrides:
+        out.append(f"  {line}")
+    return "\n".join(out)
+
+
+def _render_security_plain(reverts: list[Any], overrides: list[str], days: int) -> str:
+    lines: list[str] = []
+    all_clean = not reverts and not overrides
+
+    if all_clean:
+        lines.append(f"Good news — nothing risky in the last {days} days.")
+        lines.append("")
+        lines.append("✓ No commits on HQ have been rolled back.")
+        lines.append("✓ The security gate (that checks outside code before letting it in) hasn't been bypassed.")
+        lines.append("")
+        lines.append("Both of these are the kind of thing you'd want to hear about immediately. Silence here is the right signal.")
+        return "\n".join(lines)
+
+    lines.append(f"A couple of security-relevant things in the last {days} days:")
+    lines.append("")
+
+    if reverts:
+        lines.append(f"⏪ {len(reverts)} change{'s' if len(reverts) != 1 else ''} to HQ had to be rolled back:")
+        for r in reverts:
+            when = _humanise_date(r["commit_date"])
+            desc = _humanise_message(r["message"])
+            lines.append(f"   • {when} — {desc}")
+    else:
+        lines.append("✓ No commits on HQ have been rolled back.")
+
+    lines.append("")
+
+    if overrides:
+        lines.append(f"🚨 The security gate was bypassed {len(overrides)} time{'s' if len(overrides) != 1 else ''}:")
+        for line in overrides[:5]:
+            lines.append(f"   • {line[:120]}")
+    else:
+        lines.append("✓ The security gate hasn't been bypassed.")
+
+    return "\n".join(lines)
+
+
+def cli_cost(plain: bool = False) -> str:
+    """Report cost / efficiency numbers across recent vs older sessions."""
     _ingest_if_stale()
     values = compute_metric_values()
-    print("Cost & efficiency snapshot")
-    print()
-    for key in ("tokens_per_task", "subagents_per_task", "messages_per_completed_task",
-                "session_duration_to_first_commit"):
-        v = values.get(key)
-        if not v:
-            continue
-        label = {
-            "tokens_per_task": "thinking per task",
-            "subagents_per_task": "helpers per task",
-            "messages_per_completed_task": "your messages per task",
-            "session_duration_to_first_commit": "minutes to first change",
-        }[key]
+    labels = {
+        "tokens_per_task": "thinking per task",
+        "subagents_per_task": "helpers per task",
+        "messages_per_completed_task": "your messages per task",
+        "session_duration_to_first_commit": "minutes to first change",
+    }
+    ordered = [k for k in labels.keys() if values.get(k)]
+    if plain:
+        return _render_cost_plain(values, labels, ordered)
+    return _render_cost_terminal(values, labels, ordered)
+
+
+def _render_cost_terminal(values: dict, labels: dict, ordered: list[str]) -> str:
+    out: list[str] = ["Cost & efficiency snapshot", ""]
+    for key in ordered:
+        v = values[key]
         current = v.get("current", 0.0)
         baseline = v.get("baseline", 0.0)
         delta = v.get("percent_delta", 0.0)
         direction = "↑" if delta > 0 else ("↓" if delta < 0 else "→")
-        print(f"  {label:<28}  recent: {current:>7.2f}   recent normal: {baseline:>7.2f}   {direction} {abs(delta):5.1f}%")
+        out.append(
+            f"  {labels[key]:<28}  recent: {current:>7.2f}   "
+            f"recent normal: {baseline:>7.2f}   {direction} {abs(delta):5.1f}%"
+        )
+    return "\n".join(out)
+
+
+def _render_cost_plain(values: dict, labels: dict, ordered: list[str]) -> str:
+    if not ordered:
+        return "Not enough data yet for a cost snapshot — the watchdog needs a few more sessions."
+
+    lines: list[str] = ["Here's how Commander has been performing lately.", ""]
+    had_signal = False
+    for key in ordered:
+        v = values[key]
+        delta = v.get("percent_delta", 0.0)
+        label = labels[key]
+        rounded = int(round(abs(delta) / 5) * 5)
+        if rounded == 0 and abs(delta) >= 1:
+            rounded = int(abs(delta))
+
+        if abs(delta) < 2:
+            lines.append(f"→ {label}: basically unchanged from normal.")
+        elif delta > 0:
+            # More of this thing than normal (for cost metrics, this is usually worse)
+            lines.append(f"↑ {label}: about {rounded}% higher than normal.")
+            had_signal = True
+        else:
+            # Less than normal — for cost metrics, this is usually good
+            lines.append(f"✓ {label}: about {rounded}% lower than normal.")
+
+    if had_signal:
+        lines.append("")
+        lines.append(
+            "Worth watching if the 'higher than normal' numbers keep climbing — that's usually the "
+            "first sign Commander is drifting."
+        )
+    return "\n".join(lines)
 
 
 def _ingest_if_stale(max_age_minutes: int = 30) -> None:
@@ -1089,19 +1289,19 @@ def main() -> int:
 
     if args.rules:
         ran_something = True
-        cli_rules()
+        print(cli_rules())
 
     if args.sessions:
         ran_something = True
-        cli_sessions()
+        print(cli_sessions())
 
     if args.security:
         ran_something = True
-        cli_security()
+        print(cli_security())
 
     if args.cost:
         ran_something = True
-        cli_cost()
+        print(cli_cost())
 
     if not ran_something:
         parser.print_help()

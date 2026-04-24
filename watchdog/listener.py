@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -36,9 +35,12 @@ from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from telegram import _build_ssl_context, get_credentials  # noqa: E402
+# Local import — Pyright may resolve to the PyPI `watchdog` pkg, so type: ignore.
+from watchdog import (  # type: ignore  # noqa: E402
+    cli_rules, cli_sessions, cli_security, cli_cost, assess_and_alert,
+)
 
 WATCHDOG_DIR = Path(__file__).parent.resolve()
-WATCHDOG_PY = WATCHDOG_DIR / "watchdog.py"
 STATE_FILE = WATCHDOG_DIR / "runtime_state.json"
 AUDIT_LOG = WATCHDOG_DIR / "audit.log"
 LAST_UPDATE_FILE = WATCHDOG_DIR / ".last_update_id"
@@ -271,32 +273,54 @@ def cmd_status(state: dict[str, Any]) -> str:
 
 
 def cmd_cli(verb: str) -> str:
-    """Run watchdog.py --<verb> and return stdout."""
+    """Call the CLI helper directly with plain=True so Telegram gets conversational prose."""
+    funcs = {
+        "rules": cli_rules,
+        "sessions": cli_sessions,
+        "security": cli_security,
+        "cost": cli_cost,
+    }
+    fn = funcs.get(verb)
+    if not fn:
+        return f"I don't know how to handle '{verb}'."
     try:
-        out = subprocess.run(
-            ["python3", str(WATCHDOG_PY), f"--{verb}"],
-            capture_output=True, text=True, timeout=60, check=False,
-        )
-        result = out.stdout.strip() or out.stderr.strip() or "(no output)"
+        result = fn(plain=True)
         if len(result) > TELEGRAM_MAX_CHARS:
-            result = result[:TELEGRAM_MAX_CHARS] + "\n… (truncated — run locally for the full view)"
+            result = result[:TELEGRAM_MAX_CHARS] + "\n\n… (truncated — the full detail is available if you run it locally)"
         return result
-    except subprocess.SubprocessError as e:
-        return f"Couldn't run '{verb}': {e}"
+    except Exception as e:  # noqa: BLE001
+        audit(f"cmd_cli ERROR '{verb}': {type(e).__name__}: {e}")
+        return f"Something went wrong running '{verb}'. The audit log has the details."
 
 
 def cmd_check() -> str:
+    """Run a fresh assessment and describe the outcome in plain English."""
     try:
-        out = subprocess.run(
-            ["python3", str(WATCHDOG_PY), "--all"],
-            capture_output=True, text=True, timeout=90, check=False,
-        )
-        lines = [ln for ln in out.stdout.splitlines() if "[" in ln]
-        if not lines:
-            return "Ran a fresh assessment. Nothing unusual."
-        return "Ran a fresh assessment:\n" + "\n".join(lines)
-    except subprocess.SubprocessError as e:
-        return f"Couldn't run check: {e}"
+        outcomes = assess_and_alert()
+    except Exception as e:  # noqa: BLE001
+        audit(f"cmd_check ERROR: {type(e).__name__}: {e}")
+        return "Couldn't run a fresh assessment. The audit log has the details."
+
+    actions = {o["action"] for o in outcomes}
+    if actions <= {"quiet", "warmup"}:
+        return "Ran a fresh check — everything's within normal ranges. Nothing to flag."
+
+    lines = ["Ran a fresh check. Here's what stood out:", ""]
+    for o in outcomes:
+        action = o.get("action", "?")
+        if action in ("quiet", "warmup"):
+            continue
+        metric = PRIMARY_ALIAS.get(o.get("metric", ""), o.get("metric", "?"))
+        reason = o.get("reason", "")
+        if action == "sent":
+            lines.append(f"• Sent alert about {metric}: {reason}")
+        elif action == "suppressed":
+            lines.append(f"• {metric} still flagged but suppressed (you've already been told).")
+        elif action == "failed":
+            lines.append(f"• Tried to send alert about {metric} but it didn't get through.")
+        else:
+            lines.append(f"• {metric}: {action} — {reason}")
+    return "\n".join(lines)
 
 
 def cmd_pause(state: dict[str, Any]) -> str:
