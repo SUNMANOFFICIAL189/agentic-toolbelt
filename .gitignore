@@ -32,3 +32,7 @@ __pycache__/
 # Generated knowledge graph artefacts — canonical home is the Obsidian vault
 # (/Users/sunil_rajput/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/claude-hq/Graph/)
 graphify-out/
+
+# Secret-scrub log + credentials backups (never commit)
+scripts/.secret-scrub.log
+.credentials/claude_desktop_config.pre-keychain.*
