@@ -44,6 +44,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/sunil_rajput/claude-hq/watchdog/hooks/session-end.sh",
+            "timeout": 10000
+          }
+        ]
+      }
     ]
   }
 }
