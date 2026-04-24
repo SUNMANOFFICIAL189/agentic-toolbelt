@@ -492,22 +492,58 @@ def _compute_trust_gate_overrides() -> dict[str, float]:
 # Alert generation
 # -----------------------------------------------------------------------------
 
+CRITICAL_THROTTLE = timedelta(hours=1)
+
+
 def _should_suppress(conn: sqlite3.Connection, metric_id: str, severity: str) -> tuple[bool, str]:
-    """Decide whether to suppress this alert based on history.
+    """Decide whether to suppress this alert based on history and runtime state.
 
-    Rule: critical alerts ALWAYS fire (no cooldown, no de-dup).
-    Rule: warn alerts fire once per occurrence — once sent, stay silent until
-    the metric goes quiet (condition clears). When the condition returns
-    after a quiet period, the next alert fires.
-
-    This is edge-triggered de-duplication: you get one alert per "incident",
-    not one per assessment tick.
+    Rules:
+      * Runtime pause silences warn-level. Critical still fires (rate-limited).
+      * Runtime quiet window silences warn-level. Critical still fires.
+      * Muted metrics are silenced entirely — EXCEPT critical metrics which
+        cannot be muted (reverts, trust-gate overrides, repeat-mistake).
+      * Critical alerts fire at most once per hour per metric.
+      * Warn alerts fire once per incident (edge-triggered — waits for the
+        metric to go quiet before re-firing).
 
     Returns (suppress_bool, reason_str).
     """
+    state = _load_runtime_state()
+
+    # Mute applies first — but protected metrics can't be muted
+    if metric_id in state.get("muted_metrics", []) and metric_id not in PROTECTED_METRICS:
+        return True, f"metric muted by user (unmute with 'unmute {_metric_alias(metric_id)}')"
+
     if severity == "critical":
+        # Hourly throttle
+        last_alert = conn.execute(
+            "SELECT MAX(computed_at) AS t FROM scores "
+            "WHERE metric_id = ? AND alert_sent = 1 AND severity = 'critical'",
+            (metric_id,),
+        ).fetchone()["t"]
+        if last_alert:
+            try:
+                last_dt = datetime.fromisoformat(last_alert)
+                if datetime.now() - last_dt < CRITICAL_THROTTLE:
+                    return True, f"critical alert already sent at {last_alert[:16]}, waiting up to an hour"
+            except ValueError:
+                pass
         return False, ""
 
+    # Warn-level from here on — pause and quiet apply
+    if state.get("paused"):
+        return True, "alerts paused by user — reply 'resume' to re-enable"
+
+    quiet_until = state.get("quiet_until")
+    if quiet_until:
+        try:
+            if datetime.now() < datetime.fromisoformat(quiet_until):
+                return True, f"alerts quiet until {quiet_until[:16]}"
+        except ValueError:
+            pass
+
+    # Edge-triggered de-dup for warn-level
     last_alert = conn.execute(
         "SELECT MAX(computed_at) AS t FROM scores WHERE metric_id = ? AND alert_sent = 1",
         (metric_id,),
@@ -526,6 +562,48 @@ def _should_suppress(conn: sqlite3.Connection, metric_id: str, severity: str) ->
         return False, ""
 
     return True, f"already alerted at {last_alert} and condition has not cleared since"
+
+
+# -----------------------------------------------------------------------------
+# Runtime state — read by the scoring engine, written by the Telegram listener
+# -----------------------------------------------------------------------------
+
+RUNTIME_STATE_FILE = Path(__file__).parent / "runtime_state.json"
+
+# Protected metrics cannot be muted from Telegram (reverts, trust-gate, repeats,
+# mission-board skipping). Kept in sync with evolve.py PROTECTED_METRICS.
+PROTECTED_METRICS = {
+    "git_revert_on_claude_hq",
+    "trust_gate_overrides",
+    "lessons_rule_velocity",
+    "repeated_mistake_signal",
+    "mission_board_before_agents",
+}
+
+
+def _load_runtime_state() -> dict[str, Any]:
+    """Read runtime state (paused / quiet / muted). Safe on missing/corrupt file."""
+    if not RUNTIME_STATE_FILE.is_file():
+        return {"paused": False, "quiet_until": None, "muted_metrics": []}
+    try:
+        return json.loads(RUNTIME_STATE_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {"paused": False, "quiet_until": None, "muted_metrics": []}
+
+
+def _metric_alias(metric_id: str) -> str:
+    """Reverse lookup: metric_id → short Telegram alias."""
+    aliases = {
+        "lessons_rule_velocity": "rules",
+        "tokens_per_task": "cost",
+        "user_corrections_per_session": "corrections",
+        "subagents_per_task": "helpers",
+        "session_duration_to_first_commit": "timing",
+        "messages_per_completed_task": "messages",
+        "trust_gate_overrides": "security",
+        "git_revert_on_claude_hq": "reverts",
+    }
+    return aliases.get(metric_id, metric_id)
 
 
 def _record_score(

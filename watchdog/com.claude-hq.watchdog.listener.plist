@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  HQ Watchdog — Telegram listener launchd agent
+
+  Runs watchdog/listener.py every 30 seconds while the Mac is awake.
+  No persistent daemon — each tick is a fast, isolated invocation.
+
+  Installed by: watchdog/install-hooks.sh --listener
+  Uninstalled by: watchdog/install-hooks.sh --listener-uninstall
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.claude-hq.watchdog.listener</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/sunil_rajput/claude-hq/watchdog/listener.py</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>30</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/sunil_rajput/claude-hq</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/sunil_rajput/claude-hq/watchdog/listener.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/sunil_rajput/claude-hq/watchdog/listener.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>LowPriorityIO</key>
+    <true/>
+</dict>
+</plist>

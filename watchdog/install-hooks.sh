@@ -16,9 +16,39 @@ GIT_HOOK="${CLAUDE_HQ}/.git/hooks/post-commit"
 SETTINGS="${CLAUDE_HQ}/.claude/settings.json"
 
 MODE="${1:-install}"
+LAUNCHD_PLIST_SRC="${WATCHDOG}/com.claude-hq.watchdog.listener.plist"
+LAUNCHD_PLIST_DST="${HOME}/Library/LaunchAgents/com.claude-hq.watchdog.listener.plist"
 
 print_plain() {
     printf '%s\n' "$1"
+}
+
+install_listener() {
+    mkdir -p "$(dirname "${LAUNCHD_PLIST_DST}")"
+    # Copy (not symlink — launchd re-reads on load, symlink to a moved path would break)
+    cp "${LAUNCHD_PLIST_SRC}" "${LAUNCHD_PLIST_DST}"
+
+    # Unload if already loaded (idempotent)
+    launchctl unload "${LAUNCHD_PLIST_DST}" 2>/dev/null || true
+    if launchctl load "${LAUNCHD_PLIST_DST}" 2>&1; then
+        print_plain "✓ Telegram listener installed and started"
+        print_plain "  Polls Telegram every 30 seconds for commands from your chat"
+        print_plain "  Logs: ${WATCHDOG}/listener.out.log and listener.err.log"
+        print_plain "  Audit: ${WATCHDOG}/audit.log"
+    else
+        print_plain "❌ Failed to load launchd agent — check the error above"
+        return 1
+    fi
+}
+
+uninstall_listener() {
+    if [[ -f "${LAUNCHD_PLIST_DST}" ]]; then
+        launchctl unload "${LAUNCHD_PLIST_DST}" 2>/dev/null || true
+        rm -f "${LAUNCHD_PLIST_DST}"
+        print_plain "✓ Telegram listener uninstalled"
+    else
+        print_plain "ℹ No Telegram listener was installed"
+    fi
 }
 
 install_git_hook() {
@@ -88,23 +118,33 @@ case "${MODE}" in
         print_plain "Installing HQ Watchdog hooks…"
         install_git_hook
         install_session_hook
+        install_listener
         print_plain ""
         print_plain "Done. The watchdog will run:"
         print_plain "  • after every commit on claude-hq (post-commit hook)"
         print_plain "  • when a Claude Code session ends (Stop hook)"
+        print_plain "  • every 30 seconds polling Telegram for commands (launchd agent)"
         print_plain ""
         print_plain "Test the pipe: python3 ${WATCHDOG}/telegram.py --self-test"
-        print_plain "Disable temporarily: set WATCHDOG_ENABLED=false in ${WATCHDOG}/.env"
+        print_plain "Try it: send 'help' to your HQ Watchdog bot on Telegram"
+        print_plain "Disable temporarily: reply 'pause' on Telegram, or set WATCHDOG_ENABLED=false in ${WATCHDOG}/.env"
+        ;;
+    --listener|listener)
+        install_listener
+        ;;
+    --listener-uninstall|listener-uninstall)
+        uninstall_listener
         ;;
     --uninstall|uninstall)
         print_plain "Uninstalling HQ Watchdog hooks…"
         uninstall_git_hook
         uninstall_session_hook
+        uninstall_listener
         print_plain ""
         print_plain "Done. The watchdog code is still on disk; delete watchdog/ to remove completely."
         ;;
     *)
-        print_plain "Usage: $0 [install|--uninstall]"
+        print_plain "Usage: $0 [install|--uninstall|--listener|--listener-uninstall]"
         exit 1
         ;;
 esac
