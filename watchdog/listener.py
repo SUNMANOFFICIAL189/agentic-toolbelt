@@ -35,6 +35,7 @@ from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from telegram import _build_ssl_context, get_credentials  # noqa: E402
+import reminders as reminders_mod  # type: ignore  # noqa: E402
 # Local import — Pyright may resolve to the PyPI `watchdog` pkg, so type: ignore.
 from watchdog import (  # type: ignore  # noqa: E402
     cli_rules, cli_sessions, cli_security, cli_cost, assess_and_alert,
@@ -449,11 +450,23 @@ def dispatch(cmd: str, args: list[str], state: dict[str, Any]) -> str:
     return f"I don't understand '{cmd}'. Reply 'help' for the list of commands."
 
 
+def _check_reminders_safely() -> None:
+    """Fire any due reminders. Safe wrapper — never crashes the listener."""
+    try:
+        reminders_mod.check_and_fire()
+    except Exception as e:  # noqa: BLE001
+        audit(f"reminder check ERROR: {type(e).__name__}: {e}")
+
+
 def main() -> int:
+    # Reminder check runs first — independent of Telegram updates.
+    # If TG credentials are missing or there are no updates, reminders still fire.
+    _check_reminders_safely()
+
     token, chat_id = get_credentials()
     if not token or not chat_id:
-        audit("listener: credentials not found, exiting")
-        return 1
+        audit("listener: telegram credentials not found, exiting (reminders still ran)")
+        return 0  # not an error — reminders may still be working
     chat_id_str = str(chat_id)
 
     state = load_state()
