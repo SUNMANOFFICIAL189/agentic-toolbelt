@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import os
 import smtplib
-import ssl
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -34,7 +33,7 @@ from typing import Optional
 
 # Same banned-word list as telegram.py — kept in sync via Rule 16
 sys.path.insert(0, str(Path(__file__).parent))
-from telegram import JargonError, _lint_text  # noqa: E402
+from telegram import JargonError, _build_ssl_context, _lint_text  # noqa: E402
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -175,11 +174,16 @@ def send(email: PlainEmail, to_override: Optional[str] = None) -> dict:
 
     msg = email.to_email_message(from_addr, to_addr)
 
+    # Strip whitespace from password — Google displays App Passwords as
+    # 'xxxx xxxx xxxx xxxx' for readability; the spaces are not part of
+    # the credential and SMTP login will reject them with auth-failure.
+    password_clean = "".join(password.split())
+
     try:
-        ctx = ssl.create_default_context()
+        ctx = _build_ssl_context()
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
             server.starttls(context=ctx)
-            server.login(from_addr, password)
+            server.login(from_addr, password_clean)
             server.send_message(msg)
         return {"ok": True, "error": None}
     except smtplib.SMTPAuthenticationError as e:
