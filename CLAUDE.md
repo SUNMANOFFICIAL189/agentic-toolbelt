@@ -1,3 +1,9 @@
+<!-- Fleet project detection -->
+## Project detection
+If working inside a project containing FLEET_COMMANDER.md, load it alongside COMMANDER.md before proceeding.
+
+---
+
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 
