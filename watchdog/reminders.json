@@ -1,0 +1,62 @@
+[
+  {
+    "id": "phase-0-day-3-rpi-nudge",
+    "fire_at": "2026-04-27T08:00:00",
+    "channel": "email",
+    "severity": "info",
+    "subject": "Try the RPI commands this week",
+    "body": "The Goose RPI commands (/rpi-research, /rpi-plan, /rpi-implement, /rpi-iterate) are installed and waiting on the goose-recipes-v1 branch. The whole point of this week is to actually use them on real work — without that, the Day 7 review will have nothing to chew on.\n\nNext time you have a non-trivial task, try one of them and see how it feels.",
+    "what_to_do": "Open Claude Code and run /rpi-plan or /rpi-research on a real task this week.",
+    "sent": false,
+    "sent_at": null,
+    "error": null
+  },
+  {
+    "id": "phase-0-day-7-goose-review",
+    "fire_at": "2026-05-01T08:00:00",
+    "channel": "email",
+    "severity": "info",
+    "subject": "1-week review — how did the RPI commands perform?",
+    "body": "It's been 7 days since the HQ Watchdog and Goose RPI recipes went live. The watchdog has been measuring every session — including any where you used the RPI commands.\n\nThree decisions to make today:\n\n1. Did you actually use any RPI commands this week? If not, extend the trial another week and try them.\n2. If yes — did they help? Compare metrics from RPI sessions vs freehand.\n3. Based on the answer: merge goose-recipes-v1 to main, keep the trial running, or revert it.",
+    "what_to_do": "Open Claude Code, ask 'how did the RPI sessions compare to freehand?' and decide: merge, extend, or revert.",
+    "sent": false,
+    "sent_at": null,
+    "error": null
+  },
+  {
+    "id": "phase-2-day-18-pats-retrofit-start",
+    "fire_at": "2026-05-12T08:00:00",
+    "channel": "email",
+    "severity": "info",
+    "subject": "Watchdog template should be done — ready for PATS-Copy retrofit?",
+    "body": "Phase 2 (extracting the HQ Watchdog into a reusable template) was scoped to wrap up around now. If that's done, the next step is the first real project pilot: give PATS-Copy its own architectural watchdog.\n\nIt starts in 'observe only' mode for the first 14 days so it absorbs the current state of the codebase before warning. This is the load test for the whole project-watchdog architecture.",
+    "what_to_do": "Open Claude Code in the PATS-Copy directory and ask: 'spawn the architectural watchdog for this project, observe-only for 14 days.'",
+    "sent": false,
+    "sent_at": null,
+    "error": null
+  },
+  {
+    "id": "phase-3-day-32-pats-flip-to-active",
+    "fire_at": "2026-05-26T08:00:00",
+    "channel": "email",
+    "severity": "info",
+    "subject": "PATS observe-only window ending — ready to flip the watchdog to active?",
+    "body": "The PATS-Copy architectural watchdog has been silently observing for 14 days. It now has a baseline of what the codebase looks like and what 'normal' development on it looks like.\n\nFlipping to active means it starts surfacing alerts when it sees architectural drift (type-drift, single-source violations, etc.) — the kinds of things that surfaced as bugs in the position-tracking work.",
+    "what_to_do": "Open Claude Code and ask: 'flip the PATS watchdog from observe-only to active.' Review any backlog of would-have-fired alerts before going live.",
+    "sent": false,
+    "sent_at": null,
+    "error": null
+  },
+  {
+    "id": "phase-4-day-39-commander-step-0-mod",
+    "fire_at": "2026-06-02T08:00:00",
+    "channel": "email",
+    "severity": "info",
+    "subject": "PATS watchdog stable — ready to wire spawn into Commander Step 0?",
+    "body": "If the PATS architectural watchdog has been running cleanly for a week without too many false positives, the next step is to make project-watchdog spawning automatic.\n\nWiring it into Commander Step 0 means: from this point onward, every brand-new project gets its own architectural watchdog at the moment of project creation — no extra step required from you.",
+    "what_to_do": "Open Claude Code and ask: 'modify Commander Step 0 to instantiate a project watchdog on every new project bootstrap.'",
+    "sent": false,
+    "sent_at": null,
+    "error": null
+  }
+]
