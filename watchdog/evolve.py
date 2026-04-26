@@ -41,7 +41,7 @@ LEARNINGS_MD = WATCHDOG_DIR / "LEARNINGS.md"
 # -----------------------------------------------------------------------------
 
 PROTECTED_METRICS = {
-    "git_revert_on_claude_hq",
+    "git_revert",
     "trust_gate_overrides",
     "lessons_rule_velocity",
     "repeated_mistake_signal",

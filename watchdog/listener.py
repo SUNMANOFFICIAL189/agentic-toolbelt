@@ -61,7 +61,7 @@ ALL_COMMANDS = TIER1_CLI | TIER1_INFO | TIER2_ACTIONS
 
 # Protected metrics cannot be muted
 PROTECTED_METRICS = {
-    "git_revert_on_claude_hq",
+    "git_revert",
     "trust_gate_overrides",
     "lessons_rule_velocity",
     "repeated_mistake_signal",
@@ -79,7 +79,7 @@ METRIC_ALIASES = {
     "duration": "session_duration_to_first_commit",
     "messages": "messages_per_completed_task",
     "security": "trust_gate_overrides",
-    "reverts": "git_revert_on_claude_hq",
+    "reverts": "git_revert",
 }
 
 # Preferred display name for each metric_id (primary alias, used in status output)
@@ -91,7 +91,7 @@ PRIMARY_ALIAS = {
     "session_duration_to_first_commit": "timing",
     "messages_per_completed_task": "messages",
     "trust_gate_overrides": "security",
-    "git_revert_on_claude_hq": "reverts",
+    "git_revert": "reverts",
 }
 
 

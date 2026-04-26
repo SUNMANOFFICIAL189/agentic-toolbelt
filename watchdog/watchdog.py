@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS commits (
     is_revert INTEGER DEFAULT 0,
     touches_lessons INTEGER DEFAULT 0,
     lessons_rules_added INTEGER DEFAULT 0,
-    captured_at TEXT NOT NULL
+    captured_at TEXT NOT NULL,
+    project TEXT NOT NULL DEFAULT 'claude-hq'
 );
 
 CREATE TABLE IF NOT EXISTS scores (
@@ -103,7 +104,8 @@ CREATE TABLE IF NOT EXISTS scores (
     severity TEXT,
     alert_sent INTEGER DEFAULT 0,
     suppressed INTEGER DEFAULT 0,
-    suppression_reason TEXT
+    suppression_reason TEXT,
+    project TEXT NOT NULL DEFAULT 'claude-hq'
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(session_date);
@@ -111,11 +113,133 @@ CREATE INDEX IF NOT EXISTS idx_commits_date ON commits(commit_date);
 CREATE INDEX IF NOT EXISTS idx_scores_computed ON scores(computed_at);
 """
 
+# Default project tag for legacy rows + fallback when no explicit project given.
+# Treated as just-another-project, NOT a code-level special case (B-readiness #5).
+DEFAULT_PROJECT = "claude-hq"
+
+PROJECTS_JSON = WATCHDOG_DIR / "projects.json"
+
+
+@dataclass
+class ProjectConfig:
+    """One watched project: repo to ingest commits from, optional lessons file.
+
+    name: canonical key. MUST match the basename of the repo directory because
+      Claude Code's session-file capture uses basename to fill the
+      'Project: X' header. Cross-system identity hinges on this.
+    display_name: friendly label used in alerts and dashboards. Falls back to
+      name when not set. Lets us tag '[PATS-Copy]' on alerts even though the
+      canonical key is 'POLYMARKET_TRADING_3.0'.
+    """
+    name: str
+    repo_path: Path
+    lessons_path: Optional[Path]  # absolute, resolved against repo_path
+    display_name: Optional[str] = None
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.name
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ProjectConfig":
+        repo = Path(d["repo_path"]).expanduser()
+        lessons_rel = d.get("lessons_path")
+        lessons = (repo / lessons_rel) if lessons_rel else None
+        return cls(
+            name=d["name"],
+            repo_path=repo,
+            lessons_path=lessons,
+            display_name=d.get("display_name"),
+        )
+
+
+def load_projects() -> list[ProjectConfig]:
+    """Load projects.json. On missing/invalid, fall back to a single claude-hq entry.
+
+    Externalized config (B-readiness #2) — splitting per-project later means
+    splitting this file, not changing code paths.
+    """
+    fallback = [ProjectConfig(
+        name=DEFAULT_PROJECT,
+        repo_path=CLAUDE_HQ,
+        lessons_path=LESSONS_FILE,
+    )]
+    if not PROJECTS_JSON.is_file():
+        return fallback
+    try:
+        data = json.loads(PROJECTS_JSON.read_text())
+    except (OSError, json.JSONDecodeError):
+        return fallback
+    entries = data.get("projects") if isinstance(data, dict) else None
+    if not isinstance(entries, list) or not entries:
+        return fallback
+    out: list[ProjectConfig] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not entry.get("name") or not entry.get("repo_path"):
+            continue
+        try:
+            out.append(ProjectConfig.from_dict(entry))
+        except (KeyError, TypeError):
+            continue
+    return out or fallback
+
+
+def get_project(name: str) -> Optional[ProjectConfig]:
+    """Look up a project by name. Returns None if not registered."""
+    for p in load_projects():
+        if p.name == name:
+            return p
+    return None
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Idempotent schema migrations for existing DBs created before project tagging.
+
+    SQLite's CREATE TABLE IF NOT EXISTS won't add new columns to existing tables,
+    so we detect missing columns via PRAGMA and add them with a sane default.
+    """
+    def has_column(table: str, col: str) -> bool:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return any(r["name"] == col for r in rows)
+
+    # commits.project — added 2026-04-27 (Option C migration)
+    if not has_column("commits", "project"):
+        conn.execute(
+            f"ALTER TABLE commits ADD COLUMN project TEXT NOT NULL DEFAULT '{DEFAULT_PROJECT}'"
+        )
+        # Existing rows already get DEFAULT_PROJECT via the DEFAULT clause —
+        # explicit UPDATE is belt-and-braces in case of any NULLs from older
+        # SQLite versions that didn't apply DEFAULT during ALTER.
+        conn.execute(
+            "UPDATE commits SET project = ? WHERE project IS NULL OR project = ''",
+            (DEFAULT_PROJECT,),
+        )
+
+    # scores.project — added 2026-04-27 (Option C migration)
+    if not has_column("scores", "project"):
+        conn.execute(
+            f"ALTER TABLE scores ADD COLUMN project TEXT NOT NULL DEFAULT '{DEFAULT_PROJECT}'"
+        )
+        conn.execute(
+            "UPDATE scores SET project = ? WHERE project IS NULL OR project = ''",
+            (DEFAULT_PROJECT,),
+        )
+
+    # Project indices created post-migration so they only attempt to reference
+    # columns that definitely exist (whether from CREATE TABLE on a fresh DB
+    # or the ALTER TABLE migrations above).
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_commits_project ON commits(project)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_scores_project ON scores(project)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project)")
+
+    conn.commit()
+
 
 def db_connect() -> sqlite3.Connection:
     conn = sqlite3.connect(HISTORY_DB)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate_schema(conn)
     return conn
 
 
@@ -275,11 +399,39 @@ def ingest_sessions() -> int:
 # -----------------------------------------------------------------------------
 
 def ingest_commits(days: int = 90) -> int:
-    """Pull recent commits from claude-hq into DB. Returns count of new rows."""
+    """Pull recent commits from every registered project into DB.
+
+    Loops over all projects in projects.json and calls _ingest_one_repo per
+    project. Returns total count of upserted rows across all projects.
+
+    Project-aware (Option C, Decision Log 2026-04-27): each commit is tagged
+    with its source project so cross-project metrics never conflate.
+    """
+    now = datetime.now().isoformat(timespec="seconds")
+    conn = db_connect()
+    total = 0
+    try:
+        for project in load_projects():
+            total += _ingest_one_repo(conn, project, days, now)
+        conn.commit()
+    finally:
+        conn.close()
+    return total
+
+
+def _ingest_one_repo(
+    conn: sqlite3.Connection,
+    project: ProjectConfig,
+    days: int,
+    now: str,
+) -> int:
+    """Pull commits from one repo, tagging each with project.name."""
+    if not project.repo_path.is_dir() or not (project.repo_path / ".git").exists():
+        return 0
     since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         out = subprocess.run(
-            ["git", "-C", str(CLAUDE_HQ), "log",
+            ["git", "-C", str(project.repo_path), "log",
              f"--since={since}",
              "--pretty=format:%H%x1f%cI%x1f%s",
              "--numstat", "--no-merges"],
@@ -288,16 +440,23 @@ def ingest_commits(days: int = 90) -> int:
     except (subprocess.SubprocessError, FileNotFoundError):
         return 0
 
-    conn = db_connect()
-    new_count = 0
-    now = datetime.now().isoformat(timespec="seconds")
-
+    upserted = 0
     current: Optional[dict[str, Any]] = None
+    lessons_rel = (
+        str(project.lessons_path.relative_to(project.repo_path))
+        if project.lessons_path else None
+    )
+
+    def flush(commit: dict[str, Any]) -> None:
+        nonlocal upserted
+        commit["project"] = project.name
+        _upsert_commit(conn, commit, now)
+        upserted += 1
+
     for line in out.stdout.splitlines():
         if "\x1f" in line:
-            # Commit header
             if current:
-                _upsert_commit(conn, current, now)
+                flush(current)
             parts = line.split("\x1f")
             if len(parts) != 3:
                 continue
@@ -308,7 +467,6 @@ def ingest_commits(days: int = 90) -> int:
                 "touches_lessons": 0, "lessons_rules_added": 0,
             }
         elif line.strip() and current:
-            # numstat line: "insertions<TAB>deletions<TAB>path"
             parts = line.split("\t")
             if len(parts) != 3:
                 continue
@@ -319,50 +477,48 @@ def ingest_commits(days: int = 90) -> int:
             except ValueError:
                 pass
             current["files_changed"] += 1
-            if "LESSONS.md" in path or "lessons.md" in path.lower():
+            # Lessons-touch check is project-scoped: only the project's own
+            # lessons_path counts. Avoids cross-project false positives where
+            # an unrelated repo happens to have a "LESSONS.md" in its tree.
+            if lessons_rel and path == lessons_rel:
                 current["touches_lessons"] = 1
                 current["lessons_rules_added"] = _count_new_rules_in_commit(
-                    current["sha"]
+                    project.repo_path, current["sha"], lessons_rel
                 )
 
     if current:
-        _upsert_commit(conn, current, now)
-
-    # Re-count based on existing rows (fresh insert doesn't mean new)
-    new_count = conn.execute(
-        "SELECT COUNT(*) FROM commits WHERE captured_at = ?", (now,)
-    ).fetchone()[0]
-
-    conn.commit()
-    conn.close()
-    return new_count
+        flush(current)
+    return upserted
 
 
 def _upsert_commit(conn: sqlite3.Connection, c: dict[str, Any], now: str) -> None:
     is_revert = 1 if c["message"].lower().startswith(("revert ", "revert:")) else 0
+    project = c.get("project", DEFAULT_PROJECT)
     conn.execute(
         """INSERT OR REPLACE INTO commits
            (sha, commit_date, message, files_changed, insertions, deletions,
-            is_revert, touches_lessons, lessons_rules_added, captured_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            is_revert, touches_lessons, lessons_rules_added, captured_at, project)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
         (
             c["sha"], c["date"], c["message"],
             c["files_changed"], c["insertions"], c["deletions"],
             is_revert, c["touches_lessons"], c["lessons_rules_added"], now,
+            project,
         ),
     )
 
 
-def _count_new_rules_in_commit(sha: str) -> int:
-    """Count how many new rule headings landed in LESSONS.md for this commit."""
+def _count_new_rules_in_commit(repo_path: Path, sha: str, lessons_rel: str) -> int:
+    """Count how many new rule headings landed in this project's lessons file
+    for the given commit. repo_path + lessons_rel are project-scoped so this
+    works for any registered project, not just claude-hq."""
     try:
         out = subprocess.run(
-            ["git", "-C", str(CLAUDE_HQ), "show", f"{sha}", "--", "commander/LESSONS.md"],
+            ["git", "-C", str(repo_path), "show", f"{sha}", "--", lessons_rel],
             capture_output=True, text=True, timeout=10, check=False,
         )
     except subprocess.SubprocessError:
         return 0
-    # Count '+### ' lines (new rule headings)
     return sum(
         1 for line in out.stdout.splitlines()
         if line.startswith("+### ") and not line.startswith("+++")
@@ -373,43 +529,69 @@ def _count_new_rules_in_commit(sha: str) -> int:
 # Metric computation
 # -----------------------------------------------------------------------------
 
-def compute_metric_values() -> dict[str, dict[str, Any]]:
-    """Return {metric_id: {current, baseline, percent_delta, ...}} for all metrics.
+def compute_metric_values() -> dict[str, dict[str, dict[str, Any]]]:
+    """Return {project: {metric_id: {current, baseline, percent_delta, ...}}}.
+
+    Project-aware (Option C, Decision Log 2026-04-27): every metric is scoped
+    to one project at a time. Some metrics are intrinsically global (e.g.
+    trust_gate_overrides reads a single system-wide log) and only emit a row
+    under the claude-hq project. The rest emit one row per registered project.
 
     Values may include metric-specific extras (e.g. 'pairs', 'sessions') used
     by the alert template — consumers should treat unexpected keys as opaque.
     """
     conn = db_connect()
-    results: dict[str, dict[str, Any]] = {}
+    results: dict[str, dict[str, dict[str, Any]]] = {}
+    try:
+        projects = load_projects()
+        for project in projects:
+            pname = project.name
+            project_results: dict[str, dict[str, Any]] = {}
 
-    # Cognitive load
-    results["user_corrections_per_session"] = _compute_with_baseline(
-        conn, "AVG(correction_count)", "sessions",
-        recent_days=3, baseline_days=14,
-    )
-    results["messages_per_completed_task"] = _compute_with_baseline(
-        conn, "AVG(user_messages * 1.0 / NULLIF(files_modified, 0))", "sessions",
-        recent_days=3, baseline_days=14, where="files_modified > 0",
-    )
-    results["lessons_rule_velocity"] = _compute_rule_velocity(conn)
+            # Per-project session-derived metrics
+            project_results["user_corrections_per_session"] = _compute_with_baseline(
+                conn, "AVG(correction_count)", "sessions",
+                recent_days=3, baseline_days=14, project=pname,
+            )
+            project_results["messages_per_completed_task"] = _compute_with_baseline(
+                conn, "AVG(user_messages * 1.0 / NULLIF(files_modified, 0))", "sessions",
+                recent_days=3, baseline_days=14, where="files_modified > 0", project=pname,
+            )
+            project_results["subagents_per_task"] = _compute_with_baseline(
+                conn, "AVG(tools_used * 1.0 / NULLIF(files_modified, 0))", "sessions",
+                recent_days=3, baseline_days=14, where="files_modified > 0", project=pname,
+            )
+            project_results["session_duration_to_first_commit"] = _compute_with_baseline(
+                conn, "AVG(duration_minutes)", "sessions",
+                recent_days=3, baseline_days=14, where="duration_minutes > 0", project=pname,
+            )
 
-    # Cost / efficiency
-    results["subagents_per_task"] = _compute_with_baseline(
-        conn, "AVG(tools_used * 1.0 / NULLIF(files_modified, 0))", "sessions",
-        recent_days=3, baseline_days=14, where="files_modified > 0",
-    )
-    results["session_duration_to_first_commit"] = _compute_with_baseline(
-        conn, "AVG(duration_minutes)", "sessions",
-        recent_days=3, baseline_days=14, where="duration_minutes > 0",
-    )
+            # Per-project commit-derived metrics
+            project_results["git_revert"] = _compute_revert_flag(conn, project=pname)
+            project_results["lessons_rule_velocity"] = _compute_rule_velocity(conn, project=pname)
 
-    # Protocol fidelity (binary signals)
-    results["git_revert_on_claude_hq"] = _compute_revert_flag(conn)
-    results["trust_gate_overrides"] = _compute_trust_gate_overrides()
-    results["repeated_mistake_signal"] = _compute_repeated_mistake_signal(conn)
-    results["mission_board_before_agents"] = _compute_mission_board_before_agents(conn)
+            # Per-project session-content scans
+            project_results["mission_board_before_agents"] = (
+                _compute_mission_board_before_agents(conn, project=pname)
+            )
 
-    conn.close()
+            # Lessons-file-dependent metric — only emits if the project has a
+            # lessons_path. v1 keeps this scoped to claude-hq per Decision Log
+            # Option A (PATS lessons not scanned).
+            if project.lessons_path and project.lessons_path.is_file():
+                project_results["repeated_mistake_signal"] = (
+                    _compute_repeated_mistake_signal(project)
+                )
+
+            # Global signals — only attached to the default project (claude-hq).
+            # B-readiness note: when splitting per-project later, leave these
+            # under whichever instance owns the global infrastructure.
+            if pname == DEFAULT_PROJECT:
+                project_results["trust_gate_overrides"] = _compute_trust_gate_overrides()
+
+            results[pname] = project_results
+    finally:
+        conn.close()
     return results
 
 
@@ -420,21 +602,28 @@ def _compute_with_baseline(
     recent_days: int,
     baseline_days: int,
     where: str = "1=1",
+    project: Optional[str] = None,
 ) -> dict[str, float]:
     cutoff_recent = (datetime.now() - timedelta(days=recent_days)).strftime("%Y-%m-%d")
     cutoff_baseline_start = (datetime.now() - timedelta(days=baseline_days)).strftime("%Y-%m-%d")
 
+    project_clause = ""
+    project_params: tuple = ()
+    if project is not None:
+        project_clause = " AND project = ?"
+        project_params = (project,)
+
     current_row = conn.execute(
         f"SELECT {agg_expr} AS val FROM {table} "
-        f"WHERE session_date >= ? AND {where}",
-        (cutoff_recent,),
+        f"WHERE session_date >= ? AND {where}{project_clause}",
+        (cutoff_recent, *project_params),
     ).fetchone()
     current = float(current_row["val"]) if current_row and current_row["val"] else 0.0
 
     baseline_row = conn.execute(
         f"SELECT {agg_expr} AS val FROM {table} "
-        f"WHERE session_date >= ? AND session_date < ? AND {where}",
-        (cutoff_baseline_start, cutoff_recent),
+        f"WHERE session_date >= ? AND session_date < ? AND {where}{project_clause}",
+        (cutoff_baseline_start, cutoff_recent, *project_params),
     ).fetchone()
     baseline = float(baseline_row["val"]) if baseline_row and baseline_row["val"] else 0.0
 
@@ -442,16 +631,23 @@ def _compute_with_baseline(
     return {"current": current, "baseline": baseline, "percent_delta": pct_delta}
 
 
-def _compute_rule_velocity(conn: sqlite3.Connection) -> dict[str, float]:
+def _compute_rule_velocity(
+    conn: sqlite3.Connection,
+    project: Optional[str] = None,
+) -> dict[str, float]:
     cutoff_7d = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     cutoff_24h = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    project_clause = " AND project = ?" if project else ""
+    project_params: tuple = (project,) if project else ()
     rules_7d = conn.execute(
-        "SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits WHERE commit_date >= ?",
-        (cutoff_7d,),
+        f"SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits "
+        f"WHERE commit_date >= ?{project_clause}",
+        (cutoff_7d, *project_params),
     ).fetchone()["n"]
     rules_24h = conn.execute(
-        "SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits WHERE commit_date >= ?",
-        (cutoff_24h,),
+        f"SELECT COALESCE(SUM(lessons_rules_added),0) AS n FROM commits "
+        f"WHERE commit_date >= ?{project_clause}",
+        (cutoff_24h, *project_params),
     ).fetchone()["n"]
     return {
         "current": float(rules_24h),
@@ -462,11 +658,17 @@ def _compute_rule_velocity(conn: sqlite3.Connection) -> dict[str, float]:
     }
 
 
-def _compute_revert_flag(conn: sqlite3.Connection) -> dict[str, float]:
+def _compute_revert_flag(
+    conn: sqlite3.Connection,
+    project: Optional[str] = None,
+) -> dict[str, float]:
     cutoff_24h = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    project_clause = " AND project = ?" if project else ""
+    project_params: tuple = (project,) if project else ()
     n = conn.execute(
-        "SELECT COUNT(*) AS n FROM commits WHERE commit_date >= ? AND is_revert=1",
-        (cutoff_24h,),
+        f"SELECT COUNT(*) AS n FROM commits "
+        f"WHERE commit_date >= ? AND is_revert=1{project_clause}",
+        (cutoff_24h, *project_params),
     ).fetchone()["n"]
     return {"current": float(n), "baseline": 0.0, "percent_delta": 0.0}
 
@@ -537,19 +739,18 @@ def _jaccard(a: set[str], b: set[str]) -> float:
     return len(a & b) / len(a | b)
 
 
-def _parse_lessons_rules() -> list[dict[str, Any]]:
-    """Return list of {title, body, tokens} for each ### rule in LESSONS.md."""
-    if not LESSONS_FILE.is_file():
+def _parse_lessons_rules(lessons_path: Path) -> list[dict[str, Any]]:
+    """Return list of {title, body, tokens} for each ### rule in the given lessons file."""
+    if not lessons_path.is_file():
         return []
     try:
-        text = LESSONS_FILE.read_text()
+        text = lessons_path.read_text()
     except OSError:
         return []
     pattern = re.compile(r"^### (.+?)\n(.*?)(?=\n### |\Z)", re.MULTILINE | re.DOTALL)
     rules: list[dict[str, Any]] = []
     for m in pattern.finditer(text):
         title = m.group(1).strip()
-        # Use first ~600 chars of body — enough signal, avoids drowning in detail
         body = m.group(2).strip()[:600]
         rules.append({
             "title": title,
@@ -559,13 +760,17 @@ def _parse_lessons_rules() -> list[dict[str, Any]]:
     return rules
 
 
-def _recently_added_rule_titles(days: int = 14) -> set[str]:
-    """Titles of rule headings added to LESSONS.md in the last N days (per git)."""
+def _recently_added_rule_titles(
+    repo_path: Path,
+    lessons_rel: str,
+    days: int = 14,
+) -> set[str]:
+    """Titles of rule headings added to the given lessons file in the last N days."""
     cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         out = subprocess.run(
-            ["git", "-C", str(CLAUDE_HQ), "log", f"--since={cutoff}",
-             "--pretty=format:%H", "--", "commander/LESSONS.md"],
+            ["git", "-C", str(repo_path), "log", f"--since={cutoff}",
+             "--pretty=format:%H", "--", lessons_rel],
             capture_output=True, text=True, timeout=15, check=False,
         )
     except (subprocess.SubprocessError, FileNotFoundError):
@@ -574,14 +779,12 @@ def _recently_added_rule_titles(days: int = 14) -> set[str]:
     for sha in (s.strip() for s in out.stdout.splitlines() if s.strip()):
         try:
             diff = subprocess.run(
-                ["git", "-C", str(CLAUDE_HQ), "show", sha, "--",
-                 "commander/LESSONS.md"],
+                ["git", "-C", str(repo_path), "show", sha, "--", lessons_rel],
                 capture_output=True, text=True, timeout=10, check=False,
             ).stdout
         except subprocess.SubprocessError:
             continue
         for line in diff.splitlines():
-            # Added rule heading lines look like "+### 7. Title here"
             if line.startswith("+### ") and not line.startswith("+++"):
                 title = line[5:].strip()
                 if title:
@@ -589,30 +792,27 @@ def _recently_added_rule_titles(days: int = 14) -> set[str]:
     return titles
 
 
-def _compute_repeated_mistake_signal(_conn: sqlite3.Connection) -> dict[str, Any]:
+def _compute_repeated_mistake_signal(project: ProjectConfig) -> dict[str, Any]:
     """Detect rules added in the last 14 days that overlap topically with
-    other rules in claude-hq LESSONS.md.
+    other rules in the given project's lessons file.
 
     Similarity rule (v1, tuned for high specificity / low recall):
       * Jaccard token overlap >= 0.40  AND
       * >= 5 shared meaningful content tokens (5+ chars, non-stopword)
 
-    Tuned conservatively so the alert means "these two rules are near-duplicates,"
-    not "these two rules are in the same broad area." Real LESSONS data has many
-    rules that overlap topically (e.g. multiple Trust Gate rules) but cover
-    distinct aspects — those should not fire. Tighten further or relax based on
-    observed accuracy after a few weeks of live data.
-
-    Scope: claude-hq LESSONS.md only (per Decision Log 2026-04-27, Option A).
-    Returns:
-      current: number of repeat pairs detected (any value >= 1 fires critical)
-      pairs:   list of (title_a, title_b) for the alert template
+    Project-scoped (Option C): each project with a lessons_path gets its own
+    repeat detection over its own lessons file. Only invoked by the caller
+    when project.lessons_path is set, so we can assume it's not None here.
     """
-    rules = _parse_lessons_rules()
+    if not project.lessons_path:
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "pairs": []}
+    lessons_rel = str(project.lessons_path.relative_to(project.repo_path))
+
+    rules = _parse_lessons_rules(project.lessons_path)
     if len(rules) < 2:
         return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "pairs": []}
 
-    new_titles = _recently_added_rule_titles(days=14)
+    new_titles = _recently_added_rule_titles(project.repo_path, lessons_rel, days=14)
     if not new_titles:
         return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "pairs": []}
 
@@ -646,23 +846,39 @@ def _compute_repeated_mistake_signal(_conn: sqlite3.Connection) -> dict[str, Any
 # Mission-board-before-agents detection
 # -----------------------------------------------------------------------------
 
-def _compute_mission_board_before_agents(_conn: sqlite3.Connection) -> dict[str, Any]:
+def _compute_mission_board_before_agents(
+    conn: sqlite3.Connection,
+    project: Optional[str] = None,
+) -> dict[str, Any]:
     """Re-parse session .tmp files in the last N days. Flag sessions where
     the Task tool was used (subagent spawned) but no MISSION_BOARD reference
     appears anywhere in the session summary.
 
-    v1 caveat: misses ordering within a single session — a session that
-    spawned helpers and *then* wrote MISSION_BOARD.md still passes. This
-    is the 80% signal; ordering-aware detection requires extending session
-    ingestion to capture event sequences.
-    """
-    if not SESSIONS_DIR.is_dir():
-        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "sessions": []}
+    Project-scoped: uses the sessions table to find which session files belong
+    to the given project, then re-parses those files for tool/file content.
+    Falls back to scanning all sessions if project is None.
 
+    v1 caveat: misses ordering within a single session — a session that
+    spawned helpers and *then* wrote MISSION_BOARD.md still passes.
+    """
     cutoff = datetime.now() - timedelta(days=7)
+    cutoff_date = cutoff.strftime("%Y-%m-%d")
     offenders: list[str] = []
 
-    for path in SESSIONS_DIR.glob("*.tmp"):
+    if project is not None:
+        rows = conn.execute(
+            "SELECT session_file FROM sessions WHERE project = ? AND session_date >= ?",
+            (project, cutoff_date),
+        ).fetchall()
+        candidate_files = [Path(r["session_file"]) for r in rows]
+    else:
+        if not SESSIONS_DIR.is_dir():
+            return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "sessions": []}
+        candidate_files = list(SESSIONS_DIR.glob("*.tmp"))
+
+    for path in candidate_files:
+        if not path.is_file():
+            continue
         try:
             mtime = datetime.fromtimestamp(path.stat().st_mtime)
         except OSError:
@@ -786,8 +1002,11 @@ RUNTIME_STATE_FILE = Path(__file__).parent / "runtime_state.json"
 
 # Protected metrics cannot be muted from Telegram (reverts, trust-gate, repeats,
 # mission-board skipping). Kept in sync with evolve.py PROTECTED_METRICS.
+# Renamed 2026-04-27: git_revert_on_claude_hq → git_revert (Option C — no
+# claude-hq exceptionalism in metric IDs; project tagging now happens via the
+# scores.project column).
 PROTECTED_METRICS = {
-    "git_revert_on_claude_hq",
+    "git_revert",
     "trust_gate_overrides",
     "lessons_rule_velocity",
     "repeated_mistake_signal",
@@ -815,7 +1034,7 @@ def _metric_alias(metric_id: str) -> str:
         "session_duration_to_first_commit": "timing",
         "messages_per_completed_task": "messages",
         "trust_gate_overrides": "security",
-        "git_revert_on_claude_hq": "reverts",
+        "git_revert": "reverts",
     }
     return aliases.get(metric_id, metric_id)
 
@@ -823,18 +1042,19 @@ def _metric_alias(metric_id: str) -> str:
 def _record_score(
     conn: sqlite3.Connection,
     metric_id: str,
-    vals: dict[str, float],
+    vals: dict[str, Any],
     severity: Optional[str],
     alert_sent: bool,
     suppressed: bool,
     suppression_reason: str,
+    project: str = DEFAULT_PROJECT,
 ) -> None:
     """Persist the outcome of this assessment to the scores table."""
     conn.execute(
         """INSERT INTO scores
            (computed_at, metric_id, current_value, baseline_value, percent_delta,
-            severity, alert_sent, suppressed, suppression_reason)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+            severity, alert_sent, suppressed, suppression_reason, project)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
         (
             datetime.now().isoformat(timespec="seconds"),
             metric_id,
@@ -845,151 +1065,213 @@ def _record_score(
             1 if alert_sent else 0,
             1 if suppressed else 0,
             suppression_reason,
+            project,
         ),
     )
     conn.commit()
 
 
+def route_alert(alert: PlainAlert, project: str) -> dict:
+    """Single point of dispatch for outbound alerts. (B-readiness #3)
+
+    For Option C, every project's alerts go through the one shared Telegram
+    bot. To split into per-project bots later (Option B), swap this function
+    to look up `project` in a routing table and pick the right credentials.
+    Callers should not call telegram.send() directly — always go through here.
+    """
+    # project arg currently unused at the routing layer (single bot for all),
+    # but the signature is the future hook for B. Don't remove.
+    _ = project
+    return send_telegram(alert)
+
+
 def _try_send(
     conn: sqlite3.Connection,
     metric_id: str,
-    vals: dict[str, float],
+    vals: dict[str, Any],
     severity: str,
     reason: str,
     extra: Optional[dict[str, Any]] = None,
+    project: str = DEFAULT_PROJECT,
+    label: Optional[str] = None,
 ) -> dict[str, Any]:
     """Send an alert if suppression allows, and record the outcome.
 
-    Critical severity always sends. Warn severity fires once per
-    occurrence (edge-triggered — sends only when the metric was quiet
-    between the last alert and now).
+    project is the canonical key (matches sessions.project / commits.project /
+      scores.project). Used for DB writes and routing.
+    label is the friendly display name shown in the alert body. Falls back to
+      project when None.
     """
-    outcome: dict[str, Any] = {"metric": metric_id, "value": vals, "action": "none", "reason": reason}
+    display = label or project
+    outcome: dict[str, Any] = {
+        "metric": metric_id, "project": project, "value": vals,
+        "action": "none", "reason": reason,
+    }
 
     suppress, suppress_reason = _should_suppress(conn, metric_id, severity)
     if suppress:
         _record_score(conn, metric_id, vals, severity,
                       alert_sent=False, suppressed=True,
-                      suppression_reason=suppress_reason)
+                      suppression_reason=suppress_reason, project=project)
         outcome["action"] = "suppressed"
         outcome["reason"] = f"{reason} — {suppress_reason}"
         return outcome
 
-    alert = _build_alert(metric_id, vals, severity=severity, extra=extra)
-    result = send_telegram(alert)
+    alert = _build_alert(metric_id, vals, severity=severity, extra=extra, project=display)
+    result = route_alert(alert, project)
     sent = bool(result.get("ok"))
     _record_score(conn, metric_id, vals, severity,
-                  alert_sent=sent, suppressed=False, suppression_reason="")
+                  alert_sent=sent, suppressed=False, suppression_reason="",
+                  project=project)
     outcome["action"] = "sent" if sent else "failed"
     return outcome
 
 
-def _record_quiet(conn: sqlite3.Connection, metric_id: str, vals: dict[str, float]) -> None:
+def _record_quiet(
+    conn: sqlite3.Connection,
+    metric_id: str,
+    vals: dict[str, Any],
+    project: str = DEFAULT_PROJECT,
+) -> None:
     """Record a 'quiet' observation so edge-triggering knows the condition cleared."""
     _record_score(conn, metric_id, vals, severity=None,
-                  alert_sent=False, suppressed=False, suppression_reason="")
+                  alert_sent=False, suppressed=False, suppression_reason="",
+                  project=project)
 
 
-def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
-    """Compute metrics, check against rules, send alerts. Returns summary.
+def assess_and_alert(
+    warmup_sessions: int = 7,
+    scope_project: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Compute metrics for every registered project, alert per (project, metric).
+
+    Project-aware (Option C): outer loop over projects, inner loop over metrics.
+    Every alert is tagged with its project so route_alert can dispatch
+    correctly (single bot today; per-project bots in a future B split).
+
+    Args:
+      scope_project: when set, assess only this one project. Used by the
+        per-project post-commit hook to avoid re-scoring everything on
+        every commit. Must match a name in projects.json.
 
     De-dup rules:
-      * critical severity always fires (reverts, trust-gate overrides, repeats)
+      * critical severity always fires
       * warn severity fires once per occurrence (edge-triggered via scores table)
       * quiet observations are also recorded so re-occurrence can be detected
     """
     conn = db_connect()
-    total_sessions = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
-
-    values = compute_metric_values()
-    outcomes = []
+    outcomes: list[dict[str, Any]] = []
 
     try:
-        for metric_id, vals in values.items():
-            fired = False
+        all_values = compute_metric_values()
+        if scope_project is not None:
+            all_values = {
+                k: v for k, v in all_values.items() if k == scope_project
+            }
+        # Map canonical name → friendly label for alert prefixing
+        labels = {p.name: p.label for p in load_projects()}
+        for project, project_metrics in all_values.items():
+            project_label = labels.get(project, project)
+            # Per-project warmup gate — projects with fewer sessions still
+            # benefit from critical alerts but have warn-tier suppressed.
+            total_sessions = conn.execute(
+                "SELECT COUNT(*) AS n FROM sessions WHERE project = ?",
+                (project,),
+            ).fetchone()["n"]
 
-            # Critical flags — always alert, even in warmup
-            if metric_id == "git_revert_on_claude_hq" and vals["current"] > 0:
-                outcomes.append(_try_send(conn, metric_id, vals, "critical",
-                                          reason=f"revert on claude-hq ({int(vals['current'])} commits)"))
-                fired = True
+            for metric_id, vals in project_metrics.items():
+                fired = False
+                current = float(vals.get("current", 0.0) or 0.0)
 
-            elif metric_id == "trust_gate_overrides" and vals["current"] > 0:
-                outcomes.append(_try_send(conn, metric_id, vals, "critical",
-                                          reason=f"trust gate override used ({int(vals['current'])}x)"))
-                fired = True
-
-            elif metric_id == "repeated_mistake_signal" and vals["current"] > 0:
-                pairs = vals.get("pairs", [])
-                pair_count = int(vals["current"])
-                outcomes.append(_try_send(
-                    conn, metric_id, vals, "critical",
-                    reason=f"repeated-mistake pairs in last 14d: {pair_count}",
-                    extra={"count": pair_count, "pairs": pairs},
-                ))
-                fired = True
-
-            elif metric_id == "mission_board_before_agents" and vals["current"] > 0:
-                offender_count = int(vals["current"])
-                outcomes.append(_try_send(
-                    conn, metric_id, vals, "critical",
-                    reason=f"sessions skipping mission board: {offender_count}",
-                    extra={"count": offender_count},
-                ))
-                fired = True
-
-            elif metric_id == "lessons_rule_velocity":
-                # Rule-bursts are a "heads up", never a "something went wrong".
-                # Kept as warn even at the higher threshold.
-                if vals.get("rules_24h", 0) > 2:
+                if metric_id == "git_revert" and current > 0:
                     outcomes.append(_try_send(
-                        conn, metric_id, vals, "warn",
-                        reason=f"rules added in 24h: {int(vals['rules_24h'])}",
-                        extra={"count": int(vals["rules_24h"]), "window": "day"},
-                    ))
-                    fired = True
-                elif vals.get("rules_7d", 0) > 3:
-                    outcomes.append(_try_send(
-                        conn, metric_id, vals, "warn",
-                        reason=f"rules added in 7d: {int(vals['rules_7d'])}",
-                        extra={"count": int(vals["rules_7d"]), "window": "week"},
+                        conn, metric_id, vals, "critical",
+                        reason=f"revert on {project} ({int(current)} commits)",
+                        project=project, label=project_label,
                     ))
                     fired = True
 
-            # Warn — only after warmup period
-            elif total_sessions < warmup_sessions:
-                outcomes.append({
-                    "metric": metric_id, "value": vals,
-                    "action": "warmup",
-                    "reason": f"only {total_sessions}/{warmup_sessions} sessions captured",
-                })
-                fired = True
-
-            else:
-                pct = vals.get("percent_delta", 0.0)
-                warn_threshold = {
-                    "subagents_per_task": 50,
-                    "tokens_per_task": 30,
-                    "user_corrections_per_session": 50,
-                    "messages_per_completed_task": 30,
-                    "session_duration_to_first_commit": 50,
-                }.get(metric_id)
-                if warn_threshold and pct > warn_threshold:
+                elif metric_id == "trust_gate_overrides" and current > 0:
                     outcomes.append(_try_send(
-                        conn, metric_id, vals, "warn",
-                        reason=f"up {int(pct)}% vs recent normal",
-                        extra={"percent_more": int(pct)},
+                        conn, metric_id, vals, "critical",
+                        reason=f"trust gate override used ({int(current)}x)",
+                        project=project, label=project_label,
                     ))
                     fired = True
 
-            if not fired:
-                # Metric is within normal range — record as quiet so re-occurrence
-                # can be detected by edge-triggered de-dup.
-                _record_quiet(conn, metric_id, vals)
-                outcomes.append({
-                    "metric": metric_id, "value": vals,
-                    "action": "quiet", "reason": "",
-                })
+                elif metric_id == "repeated_mistake_signal" and current > 0:
+                    pairs = vals.get("pairs", [])
+                    pair_count = int(current)
+                    outcomes.append(_try_send(
+                        conn, metric_id, vals, "critical",
+                        reason=f"repeated-mistake pairs in last 14d: {pair_count}",
+                        extra={"count": pair_count, "pairs": pairs},
+                        project=project, label=project_label,
+                    ))
+                    fired = True
+
+                elif metric_id == "mission_board_before_agents" and current > 0:
+                    offender_count = int(current)
+                    outcomes.append(_try_send(
+                        conn, metric_id, vals, "critical",
+                        reason=f"sessions skipping mission board: {offender_count}",
+                        extra={"count": offender_count},
+                        project=project, label=project_label,
+                    ))
+                    fired = True
+
+                elif metric_id == "lessons_rule_velocity":
+                    rules_24h = float(vals.get("rules_24h", 0) or 0)
+                    rules_7d = float(vals.get("rules_7d", 0) or 0)
+                    if rules_24h > 2:
+                        outcomes.append(_try_send(
+                            conn, metric_id, vals, "warn",
+                            reason=f"rules added in 24h: {int(rules_24h)}",
+                            extra={"count": int(rules_24h), "window": "day"},
+                            project=project, label=project_label,
+                        ))
+                        fired = True
+                    elif rules_7d > 3:
+                        outcomes.append(_try_send(
+                            conn, metric_id, vals, "warn",
+                            reason=f"rules added in 7d: {int(rules_7d)}",
+                            extra={"count": int(rules_7d), "window": "week"},
+                            project=project, label=project_label,
+                        ))
+                        fired = True
+
+                elif total_sessions < warmup_sessions:
+                    outcomes.append({
+                        "metric": metric_id, "project": project, "value": vals,
+                        "action": "warmup",
+                        "reason": f"only {total_sessions}/{warmup_sessions} sessions captured for {project}",
+                    })
+                    fired = True
+
+                else:
+                    pct = float(vals.get("percent_delta", 0.0) or 0.0)
+                    warn_threshold = {
+                        "subagents_per_task": 50,
+                        "tokens_per_task": 30,
+                        "user_corrections_per_session": 50,
+                        "messages_per_completed_task": 30,
+                        "session_duration_to_first_commit": 50,
+                    }.get(metric_id)
+                    if warn_threshold and pct > warn_threshold:
+                        outcomes.append(_try_send(
+                            conn, metric_id, vals, "warn",
+                            reason=f"up {int(pct)}% vs recent normal",
+                            extra={"percent_more": int(pct)},
+                            project=project, label=project_label,
+                        ))
+                        fired = True
+
+                if not fired:
+                    _record_quiet(conn, metric_id, vals, project=project)
+                    outcomes.append({
+                        "metric": metric_id, "project": project, "value": vals,
+                        "action": "quiet", "reason": "",
+                    })
     finally:
         conn.close()
 
@@ -1007,26 +1289,31 @@ METRIC_EMOJI = {
     "mission_board_before_agents": "⚠️",
     "lessons_read_at_session_start": "📖",
     "trust_gate_overrides": "🚨",
-    "git_revert_on_claude_hq": "⏪",
+    "git_revert": "⏪",
 }
 
 
 def _build_alert(
     metric_id: str,
-    vals: dict[str, float],
+    vals: dict[str, Any],
     severity: str,
     extra: Optional[dict[str, Any]] = None,
+    project: str = DEFAULT_PROJECT,
 ) -> PlainAlert:
-    """Construct a PlainAlert from metrics.yaml templates. Zero jargon allowed."""
+    """Construct a PlainAlert from metrics.yaml templates. Zero jargon allowed.
+
+    Project-aware (Option C): a [PROJECT] tag is prefixed to what_happened so
+    Sunil can tell at a glance which project an alert belongs to. The headline
+    emoji + the [PROJECT] tag both appear before the prose body.
+    """
     extra = extra or {}
     emoji = METRIC_EMOJI.get(metric_id, "")
     template_map = _load_alert_templates()
     tpl = template_map.get(metric_id)
     if not tpl:
-        # Generic fallback — still plain English, no broken-promise reply prompt
         return PlainAlert(
             what_happened=(
-                "A quality signal has shifted in the HQ system. "
+                f"[{project}] A quality signal has shifted in the HQ system. "
                 "Something in how Commander is working has changed."
             ),
             what_to_do=(
@@ -1039,20 +1326,20 @@ def _build_alert(
 
     # Render template with safe defaults
     context = {
-        "percent_more": int(abs(vals.get("percent_delta", 0))),
-        "count": int(vals.get("current", 0)),
+        "percent_more": int(abs(float(vals.get("percent_delta", 0) or 0))),
+        "count": int(float(vals.get("current", 0) or 0)),
         "window": "recently",
-        "missed_count": int(vals.get("current", 0)),
+        "missed_count": int(float(vals.get("current", 0) or 0)),
         "total_count": 5,
         "minutes_ago": 0,
+        "project": project,
         **extra,
     }
     try:
         rendered = tpl.format(**context)
     except (KeyError, IndexError):
-        rendered = tpl  # Fall back to template literal if substitution fails
+        rendered = tpl
 
-    # Split into what_happened and what_to_do based on "What to do:" marker
     what_happened, _, what_to_do = rendered.partition("What to do:")
     if not what_to_do:
         what_happened = rendered
@@ -1061,8 +1348,15 @@ def _build_alert(
             "python3 ~/claude-hq/watchdog/watchdog.py --sessions"
         )
 
+    body = _strip_leading_emoji(what_happened.strip())
+    # Tag the alert body with the project so the recipient knows the scope.
+    # Skipped if the body already references the project (template authors
+    # may include {project} in their copy directly).
+    if f"[{project}]" not in body:
+        body = f"[{project}] {body}"
+
     return PlainAlert(
-        what_happened=_strip_leading_emoji(what_happened.strip()),
+        what_happened=body,
         what_to_do=what_to_do.strip(),
         severity=severity,
         headline_emoji=emoji,
@@ -1487,6 +1781,8 @@ def main() -> int:
     parser.add_argument("--sessions", action="store_true", help="Show recent sessions with key numbers")
     parser.add_argument("--security", action="store_true", help="Show recent reverts and Trust Gate overrides")
     parser.add_argument("--cost", action="store_true", help="Show cost / efficiency snapshot")
+    parser.add_argument("--project", type=str, default=None,
+                        help="Scope --assess to a single project (must match a name in projects.json). When omitted, all registered projects are assessed.")
     args = parser.parse_args()
 
     ran_something = False
@@ -1511,9 +1807,11 @@ def main() -> int:
 
     if args.assess or args.all:
         ran_something = True
-        outcomes = assess_and_alert()
+        outcomes = assess_and_alert(scope_project=args.project)
         for o in outcomes:
-            print(f"  [{o['action']:7}] {o['metric']}: {o['reason']}")
+            project = o.get("project", "")
+            tag = f"[{project}] " if project else ""
+            print(f"  [{o['action']:7}] {tag}{o['metric']}: {o['reason']}")
 
     if args.digest:
         ran_something = True

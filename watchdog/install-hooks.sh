@@ -74,6 +74,8 @@ fi
 
 GIT_HOOK="${PROJECT}/.git/hooks/post-commit"
 SETTINGS="${PROJECT}/.claude/settings.json"
+PROJECTS_JSON="${WATCHDOG}/projects.json"
+PROJECT_NAME="$(basename "${PROJECT}")"
 IS_CLAUDE_HQ=0
 [[ "${PROJECT}" == "${CLAUDE_HQ}" ]] && IS_CLAUDE_HQ=1
 
@@ -116,37 +118,39 @@ uninstall_listener() {
 
 # Generate a project-specific post-commit hook with absolute paths embedded.
 # Avoids symlink resolution issues when installed across project boundaries.
+# The hook passes --project NAME so the watchdog scopes assessment to this
+# project (avoids re-scoring everything on every commit) and so the structure
+# is B-ready (future per-project watchdogs would swap binary path, not args).
 write_post_commit_hook() {
     local target="$1"
     local project_dir="$2"
+    local project_name="$3"
     cat > "${target}" <<HOOK_EOF
 #!/usr/bin/env bash
 # HQ Watchdog — post-commit hook
 # Installed by: ${WATCHDOG}/install-hooks.sh
-# Project: ${project_dir}
+# Project: ${project_dir} (name: ${project_name})
 #
 # Calls the watchdog scoring engine after every commit. Never blocks.
 set -u
 
 WATCHDOG_DIR="${WATCHDOG}"
 PROJECT_DIR="${project_dir}"
+PROJECT_NAME="${project_name}"
 LOG="\${WATCHDOG_DIR}/hook.log"
 CHAINED="\${PROJECT_DIR}/.git/hooks/post-commit.pre-watchdog"
 
-# Bail if disabled globally
 if [[ -f "\${WATCHDOG_DIR}/.env" ]] && grep -q "^WATCHDOG_ENABLED=false" "\${WATCHDOG_DIR}/.env" 2>/dev/null; then
     [[ -x "\${CHAINED}" ]] && "\${CHAINED}" || true
     exit 0
 fi
 
-# Run chained hook first (synchronous) so things like graphify still work
 if [[ -x "\${CHAINED}" ]]; then
     "\${CHAINED}" || true
 fi
 
-# Run watchdog in background — commit UX stays snappy
 (
-    python3 "\${WATCHDOG_DIR}/watchdog.py" --all \\
+    python3 "\${WATCHDOG_DIR}/watchdog.py" --all --project "\${PROJECT_NAME}" \\
         >> "\${LOG}" 2>&1 || true
 ) >/dev/null 2>&1 &
 
@@ -162,7 +166,6 @@ install_git_hook() {
     fi
     mkdir -p "${PROJECT}/.git/hooks"
 
-    # Preserve any pre-existing hook
     if [[ -e "${GIT_HOOK}" ]] && [[ ! -L "${GIT_HOOK}" ]]; then
         if ! grep -q "HQ Watchdog" "${GIT_HOOK}" 2>/dev/null; then
             print_plain "⚠ ${GIT_HOOK} exists and is not a watchdog hook."
@@ -170,12 +173,81 @@ install_git_hook() {
             mv "${GIT_HOOK}" "${GIT_HOOK}.pre-watchdog"
         fi
     elif [[ -L "${GIT_HOOK}" ]]; then
-        # Old install used a symlink — replace with generated stub
         rm -f "${GIT_HOOK}"
     fi
 
-    write_post_commit_hook "${GIT_HOOK}" "${PROJECT}"
-    print_plain "✓ post-commit hook installed at ${GIT_HOOK}"
+    write_post_commit_hook "${GIT_HOOK}" "${PROJECT}" "${PROJECT_NAME}"
+    print_plain "✓ post-commit hook installed at ${GIT_HOOK} (project=${PROJECT_NAME})"
+}
+
+# -----------------------------------------------------------------------------
+# Per-project: register in projects.json (Option C / B-readiness #2)
+# -----------------------------------------------------------------------------
+
+register_project() {
+    if [[ ! -f "${PROJECTS_JSON}" ]]; then
+        print_plain "⚠ ${PROJECTS_JSON} not found — skipping registration."
+        print_plain "  The watchdog will fall back to claude-hq-only ingestion."
+        return
+    fi
+    # Idempotent JSON edit via Python so we don't add duplicates and don't
+    # corrupt the file with a sed regex.
+    python3 - "${PROJECTS_JSON}" "${PROJECT_NAME}" "${PROJECT}" <<'PY'
+import json, sys
+from datetime import date
+projects_json, name, repo_path = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(projects_json) as f:
+    data = json.load(f)
+projects = data.get("projects", [])
+existing = next((p for p in projects if p.get("name") == name), None)
+if existing:
+    existing["repo_path"] = repo_path
+    print(f"  (project '{name}' already registered, repo_path refreshed)")
+else:
+    projects.append({
+        "name": name,
+        "repo_path": repo_path,
+        "lessons_path": None,
+        "added": date.today().isoformat(),
+        "notes": "Registered automatically by install-hooks.sh.",
+    })
+    print(f"  (project '{name}' registered)")
+data["projects"] = projects
+data["last_updated"] = date.today().isoformat()
+with open(projects_json, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+    print_plain "✓ project registered in projects.json"
+}
+
+unregister_project() {
+    if [[ ! -f "${PROJECTS_JSON}" ]]; then
+        return
+    fi
+    if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
+        # Don't unregister claude-hq — it's the default project that the
+        # watchdog needs to keep working (lessons reading, fallback).
+        print_plain "ℹ Skipping unregister — claude-hq is the default project."
+        return
+    fi
+    python3 - "${PROJECTS_JSON}" "${PROJECT_NAME}" <<'PY'
+import json, sys
+from datetime import date
+projects_json, name = sys.argv[1], sys.argv[2]
+with open(projects_json) as f:
+    data = json.load(f)
+projects = data.get("projects", [])
+before = len(projects)
+projects = [p for p in projects if p.get("name") != name]
+data["projects"] = projects
+data["last_updated"] = date.today().isoformat()
+with open(projects_json, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+print(f"  (removed {before - len(projects)} entry/entries for '{name}')")
+PY
+    print_plain "✓ project removed from projects.json"
 }
 
 uninstall_git_hook() {
@@ -241,6 +313,7 @@ uninstall_session_hook() {
 case "${MODE}" in
     install)
         print_plain "Installing HQ Watchdog hooks into: ${PROJECT}"
+        register_project
         install_git_hook
         install_session_hook
         if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
@@ -262,6 +335,7 @@ case "${MODE}" in
         print_plain "Uninstalling HQ Watchdog hooks from: ${PROJECT}"
         uninstall_git_hook
         uninstall_session_hook
+        unregister_project
         if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
             uninstall_listener
         fi

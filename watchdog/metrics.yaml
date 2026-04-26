@@ -190,17 +190,17 @@ version: 1.1.0
       What to do: run this to see exactly what was overridden:
       python3 ~/claude-hq/watchdog/watchdog.py --security
 
-- id: git_revert_on_claude_hq
+- id: git_revert
   category: protocol_fidelity
   source: git_log
-  measure: count_of_revert_commits_on_claude_hq
+  measure: count_of_revert_commits_per_project
   severity:
     critical_when: "any revert commit lands on main"
   plain_language:
-    what_it_means: "Whether we had to undo a change that was already committed to HQ"
+    what_it_means: "Whether we had to undo a change that was already committed"
     why_it_matters: "Reverts on main mean something bad shipped and had to be rolled back — always worth understanding why"
     alert_template: |
-      A change to HQ had to be undone. A commit on the claude-hq repo was just reverted. That means something shipped that shouldn't have.
+      A change had to be undone. A commit on this project was just reverted. That means something shipped that shouldn't have.
 
       What to do: run this to see the original commit, the revert, and the problem:
       python3 ~/claude-hq/watchdog/watchdog.py --security
