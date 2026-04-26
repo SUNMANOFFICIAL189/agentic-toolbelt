@@ -1,34 +1,93 @@
 #!/usr/bin/env bash
 # HQ Watchdog — hook installer/uninstaller
 #
-# Installs:
-#   1. post-commit hook on ~/claude-hq/.git/hooks/post-commit
-#   2. Session-end Stop hook in ~/claude-hq/.claude/settings.json
-#   3. Cron entry for 08:00 daily digest (opt-in; prompts before touching crontab)
+# Installs the watchdog's hooks into a target project (defaults to claude-hq):
+#   1. post-commit hook in <project>/.git/hooks/post-commit
+#   2. Session-end Stop hook in <project>/.claude/settings.json
+#   3. (claude-hq only) launchd agent for Telegram listener
 #
-# Idempotent — safe to re-run. Uninstall with --uninstall.
+# Usage:
+#   ./install-hooks.sh                          # install into claude-hq
+#   ./install-hooks.sh install                  # same
+#   ./install-hooks.sh install --project PATH   # install into PATH (e.g. PATS)
+#   ./install-hooks.sh --uninstall              # remove from claude-hq
+#   ./install-hooks.sh --uninstall --project PATH
+#   ./install-hooks.sh --listener               # (re)install launchd agent
+#   ./install-hooks.sh --listener-uninstall
+#
+# Idempotent — safe to re-run.
 
 set -euo pipefail
 
 WATCHDOG="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_HQ="$(cd "${WATCHDOG}/.." && pwd)"
-GIT_HOOK="${CLAUDE_HQ}/.git/hooks/post-commit"
-SETTINGS="${CLAUDE_HQ}/.claude/settings.json"
-
-MODE="${1:-install}"
 LAUNCHD_PLIST_SRC="${WATCHDOG}/com.claude-hq.watchdog.listener.plist"
 LAUNCHD_PLIST_DST="${HOME}/Library/LaunchAgents/com.claude-hq.watchdog.listener.plist"
+
+# -----------------------------------------------------------------------------
+# Argument parsing
+# -----------------------------------------------------------------------------
+
+MODE="install"
+PROJECT=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        install) MODE="install"; shift ;;
+        --uninstall|uninstall) MODE="uninstall"; shift ;;
+        --listener|listener) MODE="listener"; shift ;;
+        --listener-uninstall|listener-uninstall) MODE="listener-uninstall"; shift ;;
+        --project)
+            shift
+            [[ $# -gt 0 ]] || { echo "❌ --project requires a path"; exit 1; }
+            PROJECT="$1"
+            shift
+            ;;
+        -h|--help)
+            sed -n '2,21p' "$0"
+            exit 0
+            ;;
+        *)
+            echo "❌ Unknown argument: $1"
+            echo "Usage: $0 [install|--uninstall|--listener|--listener-uninstall] [--project PATH]"
+            exit 1
+            ;;
+    esac
+done
+
+# Default project = claude-hq
+if [[ -z "${PROJECT}" ]]; then
+    PROJECT="${CLAUDE_HQ}"
+fi
+
+# Resolve project to absolute path (handles ~, relative paths)
+PROJECT="$(cd "${PROJECT}" 2>/dev/null && pwd || echo "${PROJECT}")"
+
+if [[ ! -d "${PROJECT}" ]]; then
+    echo "❌ Project directory does not exist: ${PROJECT}"
+    exit 1
+fi
+
+if [[ ! -d "${PROJECT}/.git" ]]; then
+    echo "⚠ ${PROJECT} is not a git repo — post-commit hook will be skipped."
+fi
+
+GIT_HOOK="${PROJECT}/.git/hooks/post-commit"
+SETTINGS="${PROJECT}/.claude/settings.json"
+IS_CLAUDE_HQ=0
+[[ "${PROJECT}" == "${CLAUDE_HQ}" ]] && IS_CLAUDE_HQ=1
 
 print_plain() {
     printf '%s\n' "$1"
 }
 
+# -----------------------------------------------------------------------------
+# Listener (launchd, claude-hq only — runs once globally)
+# -----------------------------------------------------------------------------
+
 install_listener() {
     mkdir -p "$(dirname "${LAUNCHD_PLIST_DST}")"
-    # Copy (not symlink — launchd re-reads on load, symlink to a moved path would break)
     cp "${LAUNCHD_PLIST_SRC}" "${LAUNCHD_PLIST_DST}"
-
-    # Unload if already loaded (idempotent)
     launchctl unload "${LAUNCHD_PLIST_DST}" 2>/dev/null || true
     if launchctl load "${LAUNCHD_PLIST_DST}" 2>&1; then
         print_plain "✓ Telegram listener installed and started"
@@ -51,32 +110,105 @@ uninstall_listener() {
     fi
 }
 
+# -----------------------------------------------------------------------------
+# Per-project: post-commit hook
+# -----------------------------------------------------------------------------
+
+# Generate a project-specific post-commit hook with absolute paths embedded.
+# Avoids symlink resolution issues when installed across project boundaries.
+write_post_commit_hook() {
+    local target="$1"
+    local project_dir="$2"
+    cat > "${target}" <<HOOK_EOF
+#!/usr/bin/env bash
+# HQ Watchdog — post-commit hook
+# Installed by: ${WATCHDOG}/install-hooks.sh
+# Project: ${project_dir}
+#
+# Calls the watchdog scoring engine after every commit. Never blocks.
+set -u
+
+WATCHDOG_DIR="${WATCHDOG}"
+PROJECT_DIR="${project_dir}"
+LOG="\${WATCHDOG_DIR}/hook.log"
+CHAINED="\${PROJECT_DIR}/.git/hooks/post-commit.pre-watchdog"
+
+# Bail if disabled globally
+if [[ -f "\${WATCHDOG_DIR}/.env" ]] && grep -q "^WATCHDOG_ENABLED=false" "\${WATCHDOG_DIR}/.env" 2>/dev/null; then
+    [[ -x "\${CHAINED}" ]] && "\${CHAINED}" || true
+    exit 0
+fi
+
+# Run chained hook first (synchronous) so things like graphify still work
+if [[ -x "\${CHAINED}" ]]; then
+    "\${CHAINED}" || true
+fi
+
+# Run watchdog in background — commit UX stays snappy
+(
+    python3 "\${WATCHDOG_DIR}/watchdog.py" --all \\
+        >> "\${LOG}" 2>&1 || true
+) >/dev/null 2>&1 &
+
+exit 0
+HOOK_EOF
+    chmod +x "${target}"
+}
+
 install_git_hook() {
-    if [[ -e "${GIT_HOOK}" ]] && [[ ! -L "${GIT_HOOK}" ]]; then
-        print_plain "⚠ ${GIT_HOOK} already exists and is not a symlink."
-        print_plain "  Backing it up to ${GIT_HOOK}.pre-watchdog"
-        mv "${GIT_HOOK}" "${GIT_HOOK}.pre-watchdog"
+    if [[ ! -d "${PROJECT}/.git" ]]; then
+        print_plain "ℹ Skipping post-commit hook (no .git in ${PROJECT})"
+        return
     fi
-    ln -sfn "${WATCHDOG}/hooks/post-commit" "${GIT_HOOK}"
-    chmod +x "${WATCHDOG}/hooks/post-commit"
+    mkdir -p "${PROJECT}/.git/hooks"
+
+    # Preserve any pre-existing hook
+    if [[ -e "${GIT_HOOK}" ]] && [[ ! -L "${GIT_HOOK}" ]]; then
+        if ! grep -q "HQ Watchdog" "${GIT_HOOK}" 2>/dev/null; then
+            print_plain "⚠ ${GIT_HOOK} exists and is not a watchdog hook."
+            print_plain "  Backing it up to ${GIT_HOOK}.pre-watchdog"
+            mv "${GIT_HOOK}" "${GIT_HOOK}.pre-watchdog"
+        fi
+    elif [[ -L "${GIT_HOOK}" ]]; then
+        # Old install used a symlink — replace with generated stub
+        rm -f "${GIT_HOOK}"
+    fi
+
+    write_post_commit_hook "${GIT_HOOK}" "${PROJECT}"
     print_plain "✓ post-commit hook installed at ${GIT_HOOK}"
 }
+
+uninstall_git_hook() {
+    if [[ -f "${GIT_HOOK}" ]] && grep -q "HQ Watchdog" "${GIT_HOOK}" 2>/dev/null; then
+        rm -f "${GIT_HOOK}"
+        print_plain "✓ Removed post-commit hook from ${GIT_HOOK}"
+    elif [[ -L "${GIT_HOOK}" ]]; then
+        rm -f "${GIT_HOOK}"
+        print_plain "✓ Removed post-commit symlink"
+    fi
+    if [[ -e "${GIT_HOOK}.pre-watchdog" ]]; then
+        mv "${GIT_HOOK}.pre-watchdog" "${GIT_HOOK}"
+        print_plain "✓ Restored pre-watchdog git hook"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Per-project: session-end Stop hook in .claude/settings.json
+# -----------------------------------------------------------------------------
 
 install_session_hook() {
     mkdir -p "$(dirname "${SETTINGS}")"
     chmod +x "${WATCHDOG}/hooks/session-end.sh"
 
-    # If settings.json exists and already references watchdog, skip
     if [[ -f "${SETTINGS}" ]] && grep -q "session-end.sh" "${SETTINGS}"; then
         print_plain "✓ session-end hook already registered in ${SETTINGS}"
         return
     fi
 
-    # Append a minimal Stop hook. We don't rewrite existing settings — we
-    # leave a clear note for manual merge if settings.json has other hooks.
     if [[ -f "${SETTINGS}" ]]; then
-        print_plain "ℹ ${SETTINGS} exists. Add this Stop hook manually:"
-        print_plain "    \"hooks\": { \"Stop\": [ { \"hooks\": [ { \"type\": \"command\", \"command\": \"${WATCHDOG}/hooks/session-end.sh\" } ] } ] }"
+        print_plain "ℹ ${SETTINGS} exists with other settings."
+        print_plain "  Add this Stop hook manually inside the \"hooks\" object:"
+        print_plain "    \"Stop\": [ { \"hooks\": [ { \"type\": \"command\", \"command\": \"${WATCHDOG}/hooks/session-end.sh\" } ] } ]"
     else
         cat > "${SETTINGS}" <<EOF
 {
@@ -95,17 +227,6 @@ EOF
     fi
 }
 
-uninstall_git_hook() {
-    if [[ -L "${GIT_HOOK}" ]]; then
-        rm -f "${GIT_HOOK}"
-        print_plain "✓ Removed post-commit hook"
-    fi
-    if [[ -e "${GIT_HOOK}.pre-watchdog" ]]; then
-        mv "${GIT_HOOK}.pre-watchdog" "${GIT_HOOK}"
-        print_plain "✓ Restored pre-watchdog git hook"
-    fi
-}
-
 uninstall_session_hook() {
     if [[ -f "${SETTINGS}" ]] && grep -q "session-end.sh" "${SETTINGS}"; then
         print_plain "ℹ Remove the session-end.sh entry from ${SETTINGS} manually."
@@ -113,38 +234,44 @@ uninstall_session_hook() {
     fi
 }
 
+# -----------------------------------------------------------------------------
+# Dispatch
+# -----------------------------------------------------------------------------
+
 case "${MODE}" in
-    install|"")
-        print_plain "Installing HQ Watchdog hooks…"
+    install)
+        print_plain "Installing HQ Watchdog hooks into: ${PROJECT}"
         install_git_hook
         install_session_hook
-        install_listener
+        if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
+            install_listener
+        else
+            print_plain "ℹ Listener is global — already running from claude-hq install (skipped)."
+        fi
         print_plain ""
         print_plain "Done. The watchdog will run:"
-        print_plain "  • after every commit on claude-hq (post-commit hook)"
-        print_plain "  • when a Claude Code session ends (Stop hook)"
-        print_plain "  • every 30 seconds polling Telegram for commands (launchd agent)"
+        print_plain "  • after every commit on ${PROJECT} (post-commit hook)"
+        print_plain "  • when a Claude Code session ends in ${PROJECT} (Stop hook)"
+        if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
+            print_plain "  • every 30 seconds polling Telegram for commands (launchd agent)"
+        fi
         print_plain ""
-        print_plain "Test the pipe: python3 ${WATCHDOG}/telegram.py --self-test"
-        print_plain "Try it: send 'help' to your HQ Watchdog bot on Telegram"
         print_plain "Disable temporarily: reply 'pause' on Telegram, or set WATCHDOG_ENABLED=false in ${WATCHDOG}/.env"
         ;;
-    --listener|listener)
-        install_listener
-        ;;
-    --listener-uninstall|listener-uninstall)
-        uninstall_listener
-        ;;
-    --uninstall|uninstall)
-        print_plain "Uninstalling HQ Watchdog hooks…"
+    uninstall)
+        print_plain "Uninstalling HQ Watchdog hooks from: ${PROJECT}"
         uninstall_git_hook
         uninstall_session_hook
-        uninstall_listener
+        if [[ "${IS_CLAUDE_HQ}" -eq 1 ]]; then
+            uninstall_listener
+        fi
         print_plain ""
-        print_plain "Done. The watchdog code is still on disk; delete watchdog/ to remove completely."
+        print_plain "Done. The watchdog code is still on disk; delete ${WATCHDOG} to remove completely."
         ;;
-    *)
-        print_plain "Usage: $0 [install|--uninstall|--listener|--listener-uninstall]"
-        exit 1
+    listener)
+        install_listener
+        ;;
+    listener-uninstall)
+        uninstall_listener
         ;;
 esac

@@ -373,10 +373,14 @@ def _count_new_rules_in_commit(sha: str) -> int:
 # Metric computation
 # -----------------------------------------------------------------------------
 
-def compute_metric_values() -> dict[str, dict[str, float]]:
-    """Return {metric_id: {current, baseline, percent_delta}} for all metrics."""
+def compute_metric_values() -> dict[str, dict[str, Any]]:
+    """Return {metric_id: {current, baseline, percent_delta, ...}} for all metrics.
+
+    Values may include metric-specific extras (e.g. 'pairs', 'sessions') used
+    by the alert template — consumers should treat unexpected keys as opaque.
+    """
     conn = db_connect()
-    results: dict[str, dict[str, float]] = {}
+    results: dict[str, dict[str, Any]] = {}
 
     # Cognitive load
     results["user_corrections_per_session"] = _compute_with_baseline(
@@ -402,6 +406,8 @@ def compute_metric_values() -> dict[str, dict[str, float]]:
     # Protocol fidelity (binary signals)
     results["git_revert_on_claude_hq"] = _compute_revert_flag(conn)
     results["trust_gate_overrides"] = _compute_trust_gate_overrides()
+    results["repeated_mistake_signal"] = _compute_repeated_mistake_signal(conn)
+    results["mission_board_before_agents"] = _compute_mission_board_before_agents(conn)
 
     conn.close()
     return results
@@ -486,6 +492,214 @@ def _compute_trust_gate_overrides() -> dict[str, float]:
             except ValueError:
                 pass
     return {"current": float(count_24h), "baseline": 0.0, "percent_delta": 0.0}
+
+
+# -----------------------------------------------------------------------------
+# Repeated-mistake detection (claude-hq LESSONS.md scope only)
+# -----------------------------------------------------------------------------
+
+_TOKEN_STOPWORDS = {
+    # Generic English
+    "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for",
+    "with", "by", "at", "from", "as", "is", "are", "was", "were", "be",
+    "been", "being", "this", "that", "these", "those", "have", "has", "had",
+    "not", "no", "do", "does", "don't", "dont", "didn't", "should", "must",
+    "can", "cannot", "could", "would", "will", "when", "where", "what",
+    "why", "how", "if", "then", "than", "so", "also", "only", "just", "more",
+    "most", "some", "any", "all", "every", "each", "both", "other", "same",
+    "such", "into", "onto", "via", "without", "within", "over", "under",
+    "they", "them", "their", "there", "here", "your", "you", "we're",
+    "i'm", "it's", "thats", "still", "yet", "ever", "much", "many",
+    # LESSONS-domain noise — words that recur across most rules and don't
+    # carry topical meaning. Filtered so similarity reflects *what* the rule
+    # is about, not the rule format itself.
+    "rule", "rules", "apply", "applies", "applied", "example", "examples",
+    "because", "claude", "commander", "lesson", "lessons", "session",
+    "sessions", "mistake", "mistakes", "happened", "incident", "reason",
+    "reasons", "always", "never", "instead", "before", "after", "during",
+    "first", "next", "user", "users", "input", "output", "current",
+    "code", "file", "files", "path", "paths", "step", "steps", "work",
+    "working", "build", "built", "ship", "ships", "shipped", "make",
+    "makes", "made", "real", "right", "wrong", "fail", "fails", "failed",
+    "failure", "issue", "issues", "problem", "problems",
+}
+
+
+def _tokenize_for_similarity(text: str) -> set[str]:
+    """Lowercase, keep alphabetic tokens >=5 chars, drop common stopwords."""
+    tokens = re.findall(r"[a-z][a-z'-]{4,}", text.lower())
+    return {t.strip("'-") for t in tokens if t.strip("'-") not in _TOKEN_STOPWORDS}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _parse_lessons_rules() -> list[dict[str, Any]]:
+    """Return list of {title, body, tokens} for each ### rule in LESSONS.md."""
+    if not LESSONS_FILE.is_file():
+        return []
+    try:
+        text = LESSONS_FILE.read_text()
+    except OSError:
+        return []
+    pattern = re.compile(r"^### (.+?)\n(.*?)(?=\n### |\Z)", re.MULTILINE | re.DOTALL)
+    rules: list[dict[str, Any]] = []
+    for m in pattern.finditer(text):
+        title = m.group(1).strip()
+        # Use first ~600 chars of body — enough signal, avoids drowning in detail
+        body = m.group(2).strip()[:600]
+        rules.append({
+            "title": title,
+            "body": body,
+            "tokens": _tokenize_for_similarity(title + " " + body),
+        })
+    return rules
+
+
+def _recently_added_rule_titles(days: int = 14) -> set[str]:
+    """Titles of rule headings added to LESSONS.md in the last N days (per git)."""
+    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(CLAUDE_HQ), "log", f"--since={cutoff}",
+             "--pretty=format:%H", "--", "commander/LESSONS.md"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return set()
+    titles: set[str] = set()
+    for sha in (s.strip() for s in out.stdout.splitlines() if s.strip()):
+        try:
+            diff = subprocess.run(
+                ["git", "-C", str(CLAUDE_HQ), "show", sha, "--",
+                 "commander/LESSONS.md"],
+                capture_output=True, text=True, timeout=10, check=False,
+            ).stdout
+        except subprocess.SubprocessError:
+            continue
+        for line in diff.splitlines():
+            # Added rule heading lines look like "+### 7. Title here"
+            if line.startswith("+### ") and not line.startswith("+++"):
+                title = line[5:].strip()
+                if title:
+                    titles.add(title)
+    return titles
+
+
+def _compute_repeated_mistake_signal(_conn: sqlite3.Connection) -> dict[str, Any]:
+    """Detect rules added in the last 14 days that overlap topically with
+    other rules in claude-hq LESSONS.md.
+
+    Similarity rule (v1, tuned for high specificity / low recall):
+      * Jaccard token overlap >= 0.40  AND
+      * >= 5 shared meaningful content tokens (5+ chars, non-stopword)
+
+    Tuned conservatively so the alert means "these two rules are near-duplicates,"
+    not "these two rules are in the same broad area." Real LESSONS data has many
+    rules that overlap topically (e.g. multiple Trust Gate rules) but cover
+    distinct aspects — those should not fire. Tighten further or relax based on
+    observed accuracy after a few weeks of live data.
+
+    Scope: claude-hq LESSONS.md only (per Decision Log 2026-04-27, Option A).
+    Returns:
+      current: number of repeat pairs detected (any value >= 1 fires critical)
+      pairs:   list of (title_a, title_b) for the alert template
+    """
+    rules = _parse_lessons_rules()
+    if len(rules) < 2:
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "pairs": []}
+
+    new_titles = _recently_added_rule_titles(days=14)
+    if not new_titles:
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "pairs": []}
+
+    pairs: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for new_rule in rules:
+        if new_rule["title"] not in new_titles:
+            continue
+        for other in rules:
+            if other["title"] == new_rule["title"]:
+                continue
+            key = tuple(sorted([new_rule["title"], other["title"]]))
+            if key in seen:
+                continue
+            jac = _jaccard(new_rule["tokens"], other["tokens"])
+            shared = new_rule["tokens"] & other["tokens"]
+            # AND not OR — both signals must agree for a high-confidence repeat
+            if jac >= 0.40 and len(shared) >= 5:
+                pairs.append(key)
+                seen.add(key)
+
+    return {
+        "current": float(len(pairs)),
+        "baseline": 0.0,
+        "percent_delta": 0.0,
+        "pairs": pairs,
+    }
+
+
+# -----------------------------------------------------------------------------
+# Mission-board-before-agents detection
+# -----------------------------------------------------------------------------
+
+def _compute_mission_board_before_agents(_conn: sqlite3.Connection) -> dict[str, Any]:
+    """Re-parse session .tmp files in the last N days. Flag sessions where
+    the Task tool was used (subagent spawned) but no MISSION_BOARD reference
+    appears anywhere in the session summary.
+
+    v1 caveat: misses ordering within a single session — a session that
+    spawned helpers and *then* wrote MISSION_BOARD.md still passes. This
+    is the 80% signal; ordering-aware detection requires extending session
+    ingestion to capture event sequences.
+    """
+    if not SESSIONS_DIR.is_dir():
+        return {"current": 0.0, "baseline": 0.0, "percent_delta": 0.0, "sessions": []}
+
+    cutoff = datetime.now() - timedelta(days=7)
+    offenders: list[str] = []
+
+    for path in SESSIONS_DIR.glob("*.tmp"):
+        try:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime)
+        except OSError:
+            continue
+        if mtime < cutoff:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+
+        tools = _extract_section_items(text, "Tools Used")
+        # The Tools section can be either a bullet list or a comma-separated line —
+        # parse_session_file already counts both, so check the raw text too.
+        used_task_tool = (
+            any(re.search(r"\bTask\b", t) for t in tools)
+            or bool(re.search(r"^Tools Used\s*\n.*\bTask\b", text, re.MULTILINE | re.IGNORECASE))
+        )
+        if not used_task_tool:
+            continue
+
+        # Mission board reference anywhere — Files Modified, body, headings.
+        # Match common variants (MISSION_BOARD.md, mission-board, mission board).
+        mentions_board = bool(
+            re.search(r"mission[_\- ]?board", text, re.IGNORECASE)
+        )
+        if mentions_board:
+            continue
+
+        offenders.append(path.name)
+
+    return {
+        "current": float(len(offenders)),
+        "baseline": 0.0,
+        "percent_delta": 0.0,
+        "sessions": offenders,
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -703,6 +917,25 @@ def assess_and_alert(warmup_sessions: int = 7) -> list[dict[str, Any]]:
             elif metric_id == "trust_gate_overrides" and vals["current"] > 0:
                 outcomes.append(_try_send(conn, metric_id, vals, "critical",
                                           reason=f"trust gate override used ({int(vals['current'])}x)"))
+                fired = True
+
+            elif metric_id == "repeated_mistake_signal" and vals["current"] > 0:
+                pairs = vals.get("pairs", [])
+                pair_count = int(vals["current"])
+                outcomes.append(_try_send(
+                    conn, metric_id, vals, "critical",
+                    reason=f"repeated-mistake pairs in last 14d: {pair_count}",
+                    extra={"count": pair_count, "pairs": pairs},
+                ))
+                fired = True
+
+            elif metric_id == "mission_board_before_agents" and vals["current"] > 0:
+                offender_count = int(vals["current"])
+                outcomes.append(_try_send(
+                    conn, metric_id, vals, "critical",
+                    reason=f"sessions skipping mission board: {offender_count}",
+                    extra={"count": offender_count},
+                ))
                 fired = True
 
             elif metric_id == "lessons_rule_velocity":
