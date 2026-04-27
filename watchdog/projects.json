@@ -17,6 +17,14 @@
       "lessons_path": null,
       "added": "2026-04-27",
       "notes": "Polymarket trading bot. name MUST match the directory basename so session-file ingestion (which uses basename) finds rows. display_name is the friendly label used in alerts. lessons_path null per Decision Log Option A \u2014 repeated_mistake_signal scoped to claude-hq lessons only for v1."
+    },
+    {
+      "name": "ai-agent-fleet-ventures",
+      "display_name": "Fleet",
+      "repo_path": "/Users/sunil_rajput/projects/ai-agent-fleet-ventures",
+      "lessons_path": "LESSONS_FLEET.md",
+      "added": "2026-04-27",
+      "notes": "Autonomous agent portfolio with Darwinian mortality. Mission Control fork at dashboard/mission-control-fleet/ tracked separately as subrepo (its own git remote, not part of this project's commits). Paperclip control plane evaluated 2026-04-27 \u2014 pivot decision pending. lessons_path points to project-local LESSONS_FLEET.md (separate from HQ-wide commander/LESSONS.md per brief)."
     }
   ]
 }
