@@ -36,3 +36,7 @@ graphify-out/
 # Secret-scrub log + credentials backups (never commit)
 scripts/.secret-scrub.log
 .credentials/claude_desktop_config.pre-keychain.*
+
+# Routing run state — local only (cost ledger, debug log)
+run/
+scripts/.model-router.log
