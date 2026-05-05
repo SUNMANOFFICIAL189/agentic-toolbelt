@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# api-index — entry point. Resolves to the python CLI module.
-# Resolve real path through symlinks (so ~/.local/bin/api-index works).
+# api-index-mcp — MCP server entry point (stdio transport).
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
   TARGET="$(readlink "$SOURCE")"
@@ -12,4 +11,4 @@ done
 SCRIPT_DIR="$( cd "$( dirname "$SOURCE" )" && pwd )"
 ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m api_index.cli "$@"
+exec python3 -m api_index.mcp_server "$@"
