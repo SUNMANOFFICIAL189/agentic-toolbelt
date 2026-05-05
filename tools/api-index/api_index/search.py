@@ -1,9 +1,33 @@
 """Query helpers — keyword search via FTS5, plus filters."""
 from __future__ import annotations
 
+import re
 import sqlite3
 
 from .db import connect
+
+# FTS5 reserves: " ( ) * : - AND OR NOT NEAR
+# We let users use quotes/OR/AND etc. intentionally, but auto-escape bare words
+# that contain hyphens or colons (which FTS5 treats as column qualifiers).
+_FTS_OPERATORS = {"AND", "OR", "NOT", "NEAR"}
+_BARE_TOKEN_RE = re.compile(r'^[A-Za-z0-9_\']+\*?$')
+
+
+def _sanitise_query(query: str) -> str:
+    """Quote bare tokens that would otherwise confuse FTS5 (e.g. 'real-time')."""
+    if '"' in query:
+        # User opted into explicit phrase syntax — trust them.
+        return query
+
+    parts = query.split()
+    out: list[str] = []
+    for tok in parts:
+        if tok in _FTS_OPERATORS or _BARE_TOKEN_RE.match(tok):
+            out.append(tok)
+        else:
+            cleaned = tok.replace('"', "")
+            out.append(f'"{cleaned}"')
+    return " ".join(out)
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
@@ -27,7 +51,7 @@ def search(
             "FROM apis a JOIN apis_fts ON a.id = apis_fts.rowid",
             "WHERE apis_fts MATCH ?",
         ]
-        params: list = [query]
+        params: list = [_sanitise_query(query)]
 
         if auth:
             sql.append("AND a.auth = ?")
