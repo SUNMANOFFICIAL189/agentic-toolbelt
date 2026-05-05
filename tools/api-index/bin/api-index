@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# api-index — entry point. Resolves to the python CLI module.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+exec python3 -m api_index.cli "$@"
