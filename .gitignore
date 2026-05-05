@@ -40,3 +40,6 @@ scripts/.secret-scrub.log
 # Routing run state — local only (cost ledger, debug log)
 run/
 scripts/.model-router.log
+
+# Crawl4AI dedicated venv — local only (regenerable from pip install crawl4ai)
+.venv-crawl4ai/

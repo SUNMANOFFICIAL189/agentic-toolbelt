@@ -4,7 +4,7 @@
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center for JARVIS \u2014 an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
-  "tool_count": 33,
+  "tool_count": 35,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation \u2014 this means a long-running project",
@@ -1190,6 +1190,89 @@
       "model_routing": "haiku \u2014 discovery is mechanical, no architecture decisions needed",
       "cost": "$0 \u2014 local SQLite + ONNX embeddings, no API keys",
       "reliability": "high \u2014 deterministic FTS5 search; semantic mode produces consistent rankings (model is local)"
+    },
+    {
+      "id": "crawl4ai-native",
+      "name": "Crawl4AI \u2014 LLM-ready web scraping (native, no Docker)",
+      "source": "https://github.com/unclecode/crawl4ai",
+      "type": "python_package",
+      "category": "web-fetch",
+      "owner": "external",
+      "license": "Apache 2.0",
+      "description": "Self-hosted web crawler that returns LLM-ready markdown from any URL, including JS-heavy SPAs and dynamic content. Same source as the Crawl4AI Docker image, but installed as a native Python package in a dedicated venv \u2014 no Docker daemon required.",
+      "activation_triggers": [
+        "Fetching JS-heavy SPAs where Jina Reader returns degraded content",
+        "Anti-bot pages requiring Playwright-quality fetch + clean markdown",
+        "Bulk research scrapes where output cleanliness matters more than per-fetch latency",
+        "Replaces Firecrawl (which is trial-free only, $16/mo recurring)"
+      ],
+      "anti_triggers": [
+        "Routine static pages \u2014 Jina Reader is faster and zero-setup",
+        "Pages requiring screenshots \u2014 use Playwright MCP",
+        "When the URL is trivially static and Jina suffices"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "Open source, runs locally in dedicated venv"
+      },
+      "dependencies": ["python>=3.10", "playwright (auto-installed)", "Chromium binaries (auto-fetched ~150MB)"],
+      "setup_instructions": {
+        "method": "venv + pip",
+        "venv_path": "~/claude-hq/.venv-crawl4ai",
+        "commands": [
+          "python3 -m venv ~/claude-hq/.venv-crawl4ai",
+          "HQ_TRUST_OVERRIDE=1 ~/claude-hq/.venv-crawl4ai/bin/pip install crawl4ai",
+          "~/claude-hq/.venv-crawl4ai/bin/crawl4ai-setup",
+          "~/claude-hq/.venv-crawl4ai/bin/crawl4ai-doctor"
+        ],
+        "trust_gate_note": "Author 'unclecode' not currently allowlisted. Manually verified: Apache 2.0, 65k GitHub stars, active March 2026 release. HQ_TRUST_OVERRIDE used once for the install; logged."
+      },
+      "wrapper": {
+        "cli": "~/claude-hq/scripts/fetch-page.sh <url> --mode deep",
+        "api": "~/claude-hq/scripts/lib/fetch-page.py (called via venv python)",
+        "output_format": "JSON envelope: {url, status, source, content, duration_ms}"
+      },
+      "integration_notes": "Crawl4AI is the heavy-quality fetch path. The fetch-page.sh wrapper tries Jina Reader first by default (mode=quick) and only invokes Crawl4AI when --mode auto detects degraded content or when --mode deep forces it. Layer 0 primitive \u2014 every research-heavy project (Corporate Brains, Labuan, NFL Spain, Watchdog telemetry investigations) uses it on tap.",
+      "layer": 0,
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-05-06"
+    },
+    {
+      "id": "jina-reader",
+      "name": "Jina Reader \u2014 hosted URL\u2192markdown service",
+      "source": "https://r.jina.ai/",
+      "type": "hosted_service",
+      "category": "web-fetch",
+      "owner": "external",
+      "description": "Hosted service that returns clean markdown for any URL. Just prepend https://r.jina.ai/ to the URL. ~80% the quality of Crawl4AI/Firecrawl on JS-heavy sites; on par for static pages. Zero setup, no daemon, no container.",
+      "activation_triggers": [
+        "Routine page fetches where speed + zero-setup matter",
+        "Static blogs, news, documentation pages",
+        "First attempt in fetch-page.sh's auto mode (escalates to Crawl4AI on degraded content)"
+      ],
+      "anti_triggers": [
+        "JS-heavy SPAs (use Crawl4AI)",
+        "Anti-bot / Cloudflare-challenged pages (use Crawl4AI)"
+      ],
+      "cost_profile": {
+        "type": "free",
+        "notes": "20 req/min without key, 500 req/min with free key (set JINA_API_KEY env var)"
+      },
+      "dependencies": [],
+      "setup_instructions": {
+        "method": "no_setup",
+        "commands": ["# No install. Optional: get a free key at https://jina.ai/ and export JINA_API_KEY"]
+      },
+      "wrapper": {
+        "cli": "~/claude-hq/scripts/fetch-page.sh <url>  # quick mode is the default",
+        "output_format": "JSON envelope: {url, status, source, content, duration_ms}"
+      },
+      "integration_notes": "Default workhorse. ~4-6\u00d7 faster than Crawl4AI for routine pages. Layer 0 alongside crawl4ai-native; together they replace Firecrawl entirely.",
+      "layer": 0,
+      "priority": "HIGH",
+      "status": "active",
+      "added_date": "2026-05-06"
     }
   ],
   "skills": [
