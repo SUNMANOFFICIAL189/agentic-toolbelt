@@ -238,8 +238,45 @@
 
 ---
 
+## [Open] — 2026-05-06 — claude-mem upstream quirk: ChromaSync uses add not update
+
+**What:** When claude-mem worker restarts after a crash and re-processes observations that were partially synced before the crash, the ChromaSync layer fails with "IDs already exist in collection" because it calls `chroma_add_documents` instead of `chroma_update_documents`. Observed during the 2026-05-06 paid-tier flip restart — obs IDs 653, 654, etc. tripped this on retry.
+
+**Why:** Not blocking — SQLite primary store is fine, the worker continues with remaining batches. But the ChromaDB vector index ends up with stale-or-duplicate entries for any observations that span a restart. Affects semantic-search recall quality slightly. Will accumulate noise over time as claude-mem restarts happen.
+
+**Estimate:** ~1 hour upstream. Either patch claude-mem locally or PR upstream.
+
+**How to start:**
+1. Locate the ChromaSync code in `~/.claude/plugins/cache/thedotmack/claude-mem/<version>/scripts/` — likely `worker-service.cjs` or a Chroma-specific module.
+2. Find the `chroma_add_documents` call that produces this error.
+3. Wrap with try-existing-then-update, or use `chroma_upsert_documents` if available.
+4. Test by deliberately mid-flight crashing the worker on an observation, then restarting.
+
+**Acceptance:** No "IDs already exist" errors after a restart with mid-flight observations. ChromaDB query returns clean unique vectors.
+
+---
+
+## [Open] — 2026-05-06 — claude-mem upstream quirk: parser cleans observation type from concepts array
+
+**What:** Gemini occasionally includes an observation-type label (e.g. `discovery`) inside the structured `concepts` array of a generated observation. The parser logs `[PARSER] Removed observation type from concepts array` and silently strips it. Cosmetic but suggests prompt conditioning could be tightened upstream.
+
+**Why:** Soft data-quality issue — concepts list is meant to be domain concepts, not observation-type metadata. Stripping is correct, but the log noise + the underlying prompt drift is worth a fix.
+
+**Estimate:** ~30 min — review the prompt template that conditions Gemini, add a stronger negative example.
+
+**How to start:**
+1. Find the prompt template in claude-mem's plugin cache that conditions the Gemini observation-extraction call.
+2. Add a negative example showing what NOT to put in the concepts array (specifically: "don't include observation type labels like discovery, decision, etc.").
+3. Test with a session that previously triggered the warning.
+
+**Acceptance:** No `Removed observation type from concepts array` warnings in claude-mem logs over 1 week of normal usage.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
 
 Items 5–11 added 2026-05-06 during the multi-model routing build session (Phase 0 + Phase 1 shipped, Trust Gate eval bug fixed). Items 5–9 are the Phase 2/3/4 + Watchdog listener + digest deferrals; items 10–11 are housekeeping found during the build.
+
+Items 12–13 added 2026-05-06 after the claude-mem paid-tier flip exposed two upstream quirks during backlog drain. Both non-blocking.
