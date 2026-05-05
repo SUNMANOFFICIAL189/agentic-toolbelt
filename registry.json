@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-04-21",
+  "last_updated": "2026-05-05",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center for JARVIS \u2014 an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
-  "tool_count": 32,
+  "tool_count": 33,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation \u2014 this means a long-running project",
@@ -1153,6 +1153,43 @@
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-04-21"
+    },
+    {
+      "id": "api-index",
+      "name": "API Index \u2014 Free Public APIs Discovery Tool",
+      "source": "local://claude-hq/tools/api-index/",
+      "type": "cli_tool",
+      "category": "discovery",
+      "owner": "SUNMANOFFICIAL189",
+      "description": "Searchable index of 3,932 free public APIs combining public-apis/public-apis (1,443 markdown entries) and APIs.guru (2,489 entries with OpenAPI schemas). Three search modes: FTS5 keyword (default, fastest), pure semantic via local fastembed embeddings (BAAI/bge-small-en-v1.5), and hybrid (FTS retrieval + embedding rerank \u2014 best quality). Includes auto-generation of typed client libraries from OpenAPI schemas via openapi-generator. MCP server registered as 'api-index' exposes 7 tools to Claude Code agents.",
+      "activation_triggers": [
+        "User asks: is there a free API for X?",
+        "Project kickoff that needs an external data source \u2014 discover before paying or scraping",
+        "User says: find me an API for, what data sources exist for, free APIs for",
+        "Any task involving fetching real-world data (FX rates, weather, crypto, news, geocoding, government, music, etc.)",
+        "Need a typed client library for a known API \u2014 use generate-client subcommand",
+        "Commander Step 4 (credential planning) \u2014 check if a free alternative API exists before recommending paid SaaS"
+      ],
+      "anti_triggers": [
+        "Scraping arbitrary websites \u2014 APIs only cover sites that publish official endpoints; use Firecrawl/Playwright/Lightpanda for scraping",
+        "Runtime auto-call of APIs by an agent \u2014 this tool is for *discovery*, not *execution* (auth sprawl, ToS risk per LESSONS R1)",
+        "Pre-generating wrappers for all 2,489 OpenAPI entries \u2014 only generate on demand for ones actually used",
+        "Replacement for Firecrawl, Exa, or Reddit MCP \u2014 those are the right primitives for fetching, this is for finding"
+      ],
+      "dependencies": [
+        "python3 >= 3.11",
+        "fastembed (pip, optional \u2014 only for --semantic / --hybrid)",
+        "mcp (pip, optional \u2014 only for MCP server)",
+        "openapi-generator (brew, optional \u2014 only for generate-client)"
+      ],
+      "setup_instructions": {
+        "method": "local_cli",
+        "command": "cd ~/claude-hq/tools/api-index && python3 scripts/build_index.py && python3 scripts/build_embeddings.py. Global symlink: ln -sf $(pwd)/bin/api-index ~/.local/bin/api-index. MCP server registered in ~/.claude.json mcpServers as 'api-index' \u2014 restart Claude Code to activate."
+      },
+      "integration_notes": "Use at project kickoff before recommending paid SaaS or scraping. CLI supports --semantic for vague queries (e.g. 'real-time market sentiment' matches stock+news+sentiment APIs without keyword overlap), --hybrid for best overall quality. After Claude Code restart, agents can call search_apis / semantic_search_apis / hybrid_search_apis / get_api / list_categories / apis_by_category / index_stats directly via MCP. Quarterly refresh: api-index refresh.",
+      "model_routing": "haiku \u2014 discovery is mechanical, no architecture decisions needed",
+      "cost": "$0 \u2014 local SQLite + ONNX embeddings, no API keys",
+      "reliability": "high \u2014 deterministic FTS5 search; semantic mode produces consistent rankings (model is local)"
     }
   ],
   "skills": [
