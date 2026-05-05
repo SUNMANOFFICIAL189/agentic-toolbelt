@@ -276,3 +276,42 @@
   5. The same principle applies if and when we add new recipe families
      (security-audit, full-stack-initializer, clean-up-feature-flag,
      etc.) — the default is always propose-and-confirm, never auto-run.
+
+### 18. "Note this for later" → ALWAYS go to `docs/BACKLOG.md`
+- **Rule:** Whenever the user signals that something should be tracked for
+  future work — phrases like "note this down for later", "make sure we
+  revisit this", "park this", "add to the backlog", "track this so we
+  don't forget", "we should come back to this", "save this for future" —
+  ALWAYS append the item to `~/claude-hq/docs/BACKLOG.md` using the
+  established format. Do not invent a new tracking location. Do not store
+  only in TaskCreate (session-scoped, lost at session end). Do not store
+  only in memory notes (those are about how I behave, not what work is
+  pending).
+- **Why:** 2026-05-06 — during the multi-model routing build I proposed
+  creating a new `commander/BACKLOG.md` file before checking what already
+  existed. The user (rightly) pointed out we already had
+  `docs/BACKLOG.md` (created 2026-04-22). Drift here means parked work
+  accumulates in fragmented locations: some in TaskCreate (gone next
+  session), some in memory notes, some in Watchdog reminders, some in
+  Decision Log entries. Audit trail vanishes. The point of BACKLOG.md is
+  to be the single durable register so "we should come back to X" can
+  always be looked up later.
+- **How to apply:**
+  1. Recognise the trigger phrases above (and obvious equivalents).
+  2. Read the current `docs/BACKLOG.md` to match the established format:
+     `## [Open] — YYYY-MM-DD — <title>` with What / Why / Estimate /
+     How to start / Acceptance fields. Each field non-empty.
+  3. Append to BACKLOG.md (do not insert mid-file — chronological order
+     by entry date). Items already there stay where they are; entries
+     are status-flipped (`[Open]` → `[In progress]` → `[Done]`), never
+     deleted.
+  4. Commit the BACKLOG addition. Standalone commit if not part of any
+     other work-in-progress; folded into the relevant commit if it is.
+  5. Confirm in chat: "Tracked in BACKLOG.md as item N — revisit when X."
+  6. Time-triggered reminders (cron-style "fire on date Y") still go to
+     `watchdog/reminders.json`. BACKLOG.md is the always-on register;
+     reminders.json is the alarm. Use both when both apply.
+  7. If the deferral involves an architectural decision the user already
+     made today (not just a "do later"), ALSO append a Decision Log
+     entry in the Obsidian vault with provenance tag — but BACKLOG.md
+     is still the source of truth for the work itself.
