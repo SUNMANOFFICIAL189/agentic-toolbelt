@@ -303,6 +303,41 @@
 
 ---
 
+## [Open] — 2026-05-06 — Gamma `slug_contains` returns garbage; lifecycle Strategy 3 unreliable
+
+**What:** During PATS-Copy session-start health check on 2026-05-06, queried Gamma API with `slug_contains=hormuz` and got 20 unrelated markets back (Rihanna album, GTA-VI release, Stanley Cup, Harvey Weinstein sentencing — none containing "hormuz" in slug). Either the parameter is silently ignored or it's been deprecated. `position-lifecycle.ts:267` uses this exact parameter as Strategy 3 (broad text search fallback), then takes `markets[0]` as the result — meaning if Strategies 1 and 2 fail, lifecycle silently grabs an arbitrary market and checks ITS resolution status against our position. Currently low-impact because (a) most positions resolve via Strategy 1 (exact slug), and (b) the wrong market is usually `closed=false` so it's a no-op skip; but if the wrong market ever returns `closed=true`, lifecycle would close OUR position at THAT market's settlement price.
+
+**Why:** Silent correctness bug. Mostly inert today, but a one-bad-luck-market away from a wrong-settlement close. Worth fixing or removing the fallback entirely.
+
+**Estimate:** 30 min. Either drop Strategy 3 (preferred — Strategy 1+2 cover the real cases), or replace `slug_contains` with `?q=` if Gamma supports a real text-search parameter.
+
+**How to start:**
+1. Probe Gamma's documented parameters — `?q=`, `?slug_starts_with=`, `?text_search=` — to find one that actually filters.
+2. If none works, delete Strategy 3 entirely from `position-lifecycle.ts:266-271`. The warn log "Could not find market" will fire instead, which is the correct behaviour.
+3. Add a unit test that confirms `_gammaLookup('slug=non-existent')` returns null.
+
+**Acceptance:** Either a working text-search parameter is wired in, or Strategy 3 is removed and Strategy 1/2 become the only paths. No silent wrong-market matches possible.
+
+---
+
+## [Open] — 2026-05-06 — MemPalace `mine` blocked from Claude Code subprocess
+
+**What:** Running `mempalace mine .` from within a Claude Code session against `~/Desktop/POLYMARKET_TRADING_3.0` produces inconsistent failures: first attempt segfaults (exit 139), subsequent attempts return exit 0 silently with no `polymarket_trading_3.0` wing created in the palace. `mempalace status` works fine. `mempalace mine --dry-run` produces correct output. This blocked the same step in the previous session (2026-05-05) too — at that time attributed to TCC (macOS Transparency, Consent, Control) permission issues with the Terminal hosting Claude Code not having Full Disk Access.
+
+**Why:** Memory-layer sync drift. Each blocked session means Phase 3.5 trade observations don't make it into the cross-session palace, weakening the next session's recall.
+
+**Estimate:** 1–2 hours. Mostly diagnostic.
+
+**How to start:**
+1. Compare TCC permissions on the Terminal app vs. iTerm vs. Warp — whichever one is hosting Claude Code needs Full Disk Access to `~/.mempalace/palace/`.
+2. Reproduce by running `mempalace mine ~/Desktop/POLYMARKET_TRADING_3.0` from a fresh native Terminal window outside Claude Code. If that works, confirms the harness is the issue.
+3. Either grant Claude Code's host Terminal Full Disk Access, OR add a session-end hook that runs the mine via a launchd helper outside the harness.
+4. Verify by checking `mempalace status` afterward shows the wing populated.
+
+**Acceptance:** `mempalace status` shows a `polymarket_trading_3.0` wing with non-zero drawer counts after a session.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
