@@ -458,10 +458,28 @@ def _check_reminders_safely() -> None:
         audit(f"reminder check ERROR: {type(e).__name__}: {e}")
 
 
+def _send_heartbeat() -> None:
+    """Healthchecks.io heartbeat — fire-and-forget. URL lives in healthchecks-urls.env (gitignored)."""
+    env_file = WATCHDOG_DIR / "healthchecks-urls.env"
+    if not env_file.exists():
+        return
+    try:
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("HC_PING_LISTENER="):
+                url = line.split("=", 1)[1].strip().strip("'\"")
+                if url:
+                    urllib.request.urlopen(url, timeout=5)
+                return
+    except Exception:  # noqa: BLE001 — heartbeat must never crash the listener
+        pass
+
+
 def main() -> int:
     # Reminder check runs first — independent of Telegram updates.
     # If TG credentials are missing or there are no updates, reminders still fire.
     _check_reminders_safely()
+    _send_heartbeat()
 
     token, chat_id = get_credentials()
     if not token or not chat_id:
