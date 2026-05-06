@@ -273,6 +273,36 @@
 
 ---
 
+## [Open] — 2026-05-06 — Apify-equivalent capability for locked-down platform scraping
+
+**What:** Today's Layer 0 stack (Crawl4AI + Jina + Exa + Puppeteer + Reddit MCP) handles public web pages well but cannot scrape **locked-down social platforms** — Twitter/X, Instagram, Facebook, LinkedIn, TikTok. These sites combine login walls, anti-bot challenges (Cloudflare, Arkose Labs, custom JS challenges), and IP/behaviour fingerprinting that defeats any local-Playwright-plus-LLM-extraction architecture. The gap is "Apify-class capability" — site-specific maintained scrapers running through rotating residential/datacenter/mobile proxies. ScrapeGraphAI was evaluated 2026-05-06 and ruled out (same fetch-and-parse architecture as Crawl4AI, hits the same walls).
+
+**Why:** The gap is real but currently latent — Corporate Brains Phase 1 doesn't need locked-down social data (public sources cover competitor research). For any future project requiring Twitter sentiment, Instagram brand monitoring, LinkedIn employee/funding signals, Facebook page scraping, or TikTok content harvesting, we'd hit the wall. Documenting the three concrete paths now means future-Sunil doesn't redo the eval — just picks the right path for the use case.
+
+**Estimate:** Open-ended — depends entirely on which path. Cheapest to costliest:
+- **Pay Apify Actor per-platform** ($30–50/mo): trivial, no engineering work, cancel after use
+- **Wire official APIs** (Twitter Basic $100/mo, YouTube free, Reddit free, LinkedIn very expensive): 1–2 hours per platform, sustainable but limited scope
+- **Crawlee + self-hosted proxies** (Apify's own open-source actor framework, MIT): 1–2 weeks to set up + ongoing $5–15/GB residential proxy costs
+
+**How to start (when triggered):**
+1. **Trigger condition:** a real use case demands locked-down social-platform data that public sources cannot supply. Until then, do NOT pre-build per Lesson 20 — instrument the need first, build second.
+2. When triggered: identify the specific platform(s) and the data volume (one-off vs. ongoing recurring).
+3. Pick the path:
+   - One-off / low volume / single platform → Apify Actor for that platform ($30–50/mo, cancel after)
+   - Recurring need on Twitter / YouTube / Reddit only → official APIs (sustainable, ToS-clean)
+   - Multi-platform recurring at scale → evaluate Crawlee + proxy infrastructure vs. ongoing Apify subscription
+4. **Trust Gate considerations at adoption time:**
+   - Apify (the company) — not currently allowlisted; review their security posture, postmortems, and Trust Gate Tier C
+   - Crawlee — published by Apify under MIT; run through Tier C
+   - `snscrape` / `Instaloader` / `facebook-scraper` — MIT, but fragile (break when platforms update); ToS-grey for some
+5. Update `~/claude-hq/registry.json` with the chosen tool(s) at the appropriate Layer.
+
+**Why ScrapeGraphAI was ruled out (so we don't re-evaluate it):** It fetches with local Playwright + extracts with an LLM. That's mechanically identical to Crawl4AI which we already have. Both hit the same walls on Twitter/Instagram/Facebook/LinkedIn — the bottleneck is *getting through the door* (proxies + site-specific Actors), not LLM extraction. Adding it would duplicate Crawl4AI under a different brand without bridging the gap.
+
+**Acceptance:** When the trigger fires, the implementer picks a path from this entry without redoing the evaluation. The chosen path delivers the specific platform data needed for the specific use case, with an entry in registry.json, Trust Gate clearance, and (if recurring spend) a cost-ledger note.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
@@ -280,3 +310,5 @@ Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whethe
 Items 5–11 added 2026-05-06 during the multi-model routing build session (Phase 0 + Phase 1 shipped, Trust Gate eval bug fixed). Items 5–9 are the Phase 2/3/4 + Watchdog listener + digest deferrals; items 10–11 are housekeeping found during the build.
 
 Items 12–13 added 2026-05-06 after the claude-mem paid-tier flip exposed two upstream quirks during backlog drain. Both non-blocking.
+
+Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Captures the Apify-class gap with three concrete paths so future-self doesn't redo the eval. ScrapeGraphAI itself was ruled out for HQ — see the entry's "Why ruled out" subsection.
