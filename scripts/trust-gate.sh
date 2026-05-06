@@ -26,25 +26,31 @@ log() { echo "[trust-gate $(date +%H:%M:%S)] $*" >> "$LOG"; }
 # Read hook input
 INPUT="$(cat)"
 
-# Parse tool name and command (requires python3 for JSON safety)
+# Parse tool name and command. Uses NUL-delimited raw values so bash never
+# re-evaluates the contents — important because CMD can contain $(...) or
+# backticks (e.g. `git commit -m "$(cat <<'EOF'...EOF)"`) which would be
+# re-executed if we used eval. See LESSONS rule 7 (use proper parsers).
 parse_hook_input() {
-  python3 - <<PY
-import json, sys, os
+  python3 - <<'PY'
+import json, os, sys
 try:
-    data = json.loads(os.environ.get('INPUT', '{}'))
+    data = json.loads(os.environ.get('INPUT', '') or '{}')
 except Exception:
     data = {}
-tool_name = data.get('tool_name', '')
-tool_input = data.get('tool_input', {})
+tool_name = (data.get('tool_name') or '')
+tool_input = data.get('tool_input') or {}
 command = tool_input.get('command', '') if isinstance(tool_input, dict) else ''
-# Print as env-safe lines
-print('TOOL_NAME=' + json.dumps(tool_name))
-print('CMD=' + json.dumps(command))
+sys.stdout.buffer.write(tool_name.encode('utf-8') + b'\x00')
+sys.stdout.buffer.write(command.encode('utf-8') + b'\x00')
 PY
 }
 
 export INPUT
-eval "$(parse_hook_input)"
+TOOL_NAME=""
+CMD=""
+# Fail-open: if the read fails for any reason, hook continues with empty
+# values and the early "non-Bash" exit below short-circuits cleanly.
+{ IFS= read -r -d '' TOOL_NAME && IFS= read -r -d '' CMD; } < <(parse_hook_input) || true
 
 log "tool=$TOOL_NAME cmd=$CMD"
 

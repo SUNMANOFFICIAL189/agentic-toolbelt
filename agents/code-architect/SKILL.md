@@ -1,5 +1,6 @@
 ---
 name: code-architect
+model: opus
 description: >
   Autonomous architecture agent that produces system designs, file structures, dependency
   maps, and technical decisions for software projects. Takes a project brief or PRD and
@@ -8,6 +9,10 @@ description: >
   "plan the system", "how should I structure this", "tech stack for X", or when Commander
   needs architectural decisions before delegating build tasks to coding agents.
 ---
+
+<!-- model: opus is enforced as hard floor per commander/MODEL_ROUTING.md §4. Architecture
+     decisions cascade — re-doing them after the fact is expensive. Do not downgrade. -->
+
 
 # Code Architect
 

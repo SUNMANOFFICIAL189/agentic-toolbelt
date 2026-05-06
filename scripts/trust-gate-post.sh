@@ -21,22 +21,28 @@ log() { echo "[trust-gate-post $(date +%H:%M:%S)] $*" >> "$LOG"; }
 INPUT="$(cat)"
 export INPUT
 
-# Parse tool output and command
+# Parse tool output and command. Uses NUL-delimited raw values so bash never
+# re-evaluates the contents — same fix as trust-gate.sh. See LESSONS rule 7.
 parse_input() {
   python3 - <<'PY'
-import json, os
+import json, os, sys
 try:
-    data = json.loads(os.environ.get('INPUT', '{}'))
+    data = json.loads(os.environ.get('INPUT', '') or '{}')
 except Exception:
     data = {}
-tool_name = data.get('tool_name', '')
-tool_input = data.get('tool_input', {})
+tool_name = (data.get('tool_name') or '')
+tool_input = data.get('tool_input') or {}
 command = tool_input.get('command', '') if isinstance(tool_input, dict) else ''
-print('TOOL_NAME=' + json.dumps(tool_name))
-print('CMD=' + json.dumps(command))
+sys.stdout.buffer.write(tool_name.encode('utf-8') + b'\x00')
+sys.stdout.buffer.write(command.encode('utf-8') + b'\x00')
 PY
 }
-eval "$(parse_input)"
+
+TOOL_NAME=""
+CMD=""
+# Fail-open: if the read fails, hook continues with empty values and the
+# non-Bash early exit short-circuits cleanly.
+{ IFS= read -r -d '' TOOL_NAME && IFS= read -r -d '' CMD; } < <(parse_input) || true
 
 [[ "$TOOL_NAME" != "Bash" ]] && exit 0
 
@@ -47,10 +53,12 @@ fi
 
 # Determine clone target dir (last token, or parsed from URL)
 CLONE_TARGET=""
-# If explicit dir given as last arg
+# If explicit dir given as last arg.
+# NOTE: avoid ${tokens[-1]} — that's bash 4.2+ syntax. macOS /bin/bash is 3.2.
 tokens=($CMD)
-if [[ ${#tokens[@]} -ge 4 && -d "${tokens[-1]}" ]]; then
-  CLONE_TARGET="${tokens[-1]}"
+last_idx=$(( ${#tokens[@]} - 1 ))
+if [[ ${#tokens[@]} -ge 4 && $last_idx -ge 0 && -d "${tokens[$last_idx]}" ]]; then
+  CLONE_TARGET="${tokens[$last_idx]}"
 else
   # Infer from URL: .../REPO.git or .../REPO
   url="${BASH_REMATCH[2]}"

@@ -1,0 +1,13 @@
+.env
+history.db
+history.db-journal
+*.pyc
+__pycache__/
+baseline.json.bak
+hook.log
+audit.log
+runtime_state.json
+.last_update_id
+.rate_limit.json
+listener.out.log
+listener.err.log

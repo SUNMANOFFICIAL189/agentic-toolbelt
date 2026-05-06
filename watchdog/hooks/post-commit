@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# HQ Watchdog — post-commit hook for claude-hq
+#
+# Runs the scoring engine after every commit. Safe-by-default:
+#   - Never blocks or delays the commit (runs in background, detached)
+#   - Never fails the git operation (always exits 0)
+#   - Catches all errors and drops them to a log
+#
+# Chains: if a pre-existing post-commit hook was preserved at
+# post-commit.pre-watchdog, run it first (synchronously) so things
+# like the graphify rebuild still work.
+#
+# Installed by: watchdog/install-hooks.sh
+# Uninstalled by: watchdog/install-hooks.sh --uninstall
+set -u
+
+CLAUDE_HQ="$(cd "$(dirname "$0")/../.." && pwd)"
+WATCHDOG="${CLAUDE_HQ}/watchdog"
+LOG="${WATCHDOG}/hook.log"
+CHAINED="${CLAUDE_HQ}/.git/hooks/post-commit.pre-watchdog"
+
+# Bail early if watchdog was disabled
+if [[ -f "${WATCHDOG}/.env" ]] && grep -q "^WATCHDOG_ENABLED=false" "${WATCHDOG}/.env" 2>/dev/null; then
+    # Still run any chained hook so other systems keep working
+    [[ -x "${CHAINED}" ]] && "${CHAINED}" || true
+    exit 0
+fi
+
+# 1) Run any chained hook first (graphify etc.) — synchronous, output visible
+if [[ -x "${CHAINED}" ]]; then
+    "${CHAINED}" || true
+fi
+
+# 2) Run the watchdog scoring in the background so commit UX stays snappy
+(
+    cd "${CLAUDE_HQ}" || exit 0
+    python3 "${WATCHDOG}/watchdog.py" --all \
+        >> "${LOG}" 2>&1 || true
+) >/dev/null 2>&1 &
+
+# Always succeed — the watchdog never blocks real work
+exit 0

@@ -167,6 +167,38 @@
   don't; the source is already markdown and Obsidian-native. Write a
   wikilink from the Hub pointing at the source.
 
+### 14. Plaintext-secret config files are landmines — read them only via redirected tools
+- **Rule:** If a file is known to contain plaintext secrets (`claude_desktop_config.json`,
+  `.env`, credentials registries), never surface its contents directly through the `Read`
+  tool. Route secrets via scripts that touch them in-memory only and write to a secure
+  store (macOS Keychain, a gitignored mode-600 file). If a `Read` is unavoidable for
+  structural inspection, pair it with an immediate scrub + acknowledge the secondary
+  leak into session transcripts and claude-mem.
+- **Why:** 2026-04-21 → 2026-04-22 — reading `claude_desktop_config.json` to diagnose
+  why the Reddit MCP wasn't available surfaced 4 live secrets (Anthropic, Gemini,
+  GitHub, Reddit client secret) into tool output, which flowed into claude-mem
+  observations (1 row) and 8 local session transcripts before we caught it. Sunil
+  opted against rotation, so we migrated to Keychain + launchers + session-end
+  scrubber. The local leak was fully scrubbable; the Anthropic-backend leak is not.
+- **How to apply:** When an MCP/credential question forces config inspection, prefer
+  `security find-generic-password`, `env | grep`, or a helper script that reads the
+  config, stores in Keychain, and rewrites the file — all in one pass with no stdout
+  echo of values. The one-pass migration script is at
+  `~/claude-hq/scripts/mcp-migrate-to-keychain.sh`. Session-end scrubber is at
+  `~/claude-hq/scripts/lib/secret-scrub.sh`. Both are idempotent.
+
+### 15. macOS Keychain + launcher scripts is the right home for MCP secrets
+- **Rule:** Any MCP that needs an API key, token, or client secret must be launched
+  via a script in `~/claude-hq/scripts/mcp-launchers/` that fetches the secret from
+  Keychain at spawn time. The Claude Desktop config references the launcher path;
+  the config's `env: {}` block stays empty (or contains only public identifiers like
+  OAuth client IDs).
+- **Why:** Desktop config sits at a known path, is world-readable by anything with
+  your user permissions, and gets read by skills/agents for diagnostics. Keychain
+  entries are encrypted at rest and require your login. Launchers keep the spawn
+  command short and the config clean.
+- **How to apply:** New MCP with a secret → (1) `security add-generic-password -U -a "$USER" -s "claude-mcp-<name>" -w <value>`; (2) copy an existing launcher from `~/claude-hq/scripts/mcp-launchers/`, adapt the service name and exec line; (3) update `claude_desktop_config.json` to point to the launcher with `env: {}`; (4) restart Claude Desktop.
+
 ### 13. `.gitignore` patterns with `/` are anchored to the gitignore's location
 - **Rule:** In a multi-level repo (where the `.gitignore` sits above
   the actual content dir), patterns like `.obsidian/workspace.json`
@@ -180,3 +212,176 @@
 - **How to apply:** If your repo root is one level above the actual
   content, prefix subdirectory-anchored patterns with `**/`. Test:
   `git check-ignore -v <file>` should report the matching pattern.
+
+### 16. All user-facing alerts must be in plain English — no jargon, ever
+- **Rule:** Any system built under the HQ umbrella that sends messages to
+  Sunil (Telegram, email, push, SMS, anything) MUST describe what happened
+  and what to do in natural language a non-technical reader can understand
+  at a glance. Technical detail stays in logs, SQLite, or audit files —
+  it never reaches the phone. This applies to every alerting system, not
+  just Watchdog.
+- **Why:** 2026-04-24 — while building the HQ Watchdog, Sunil explicitly
+  asked to hardwire this constraint because technical alerts force a
+  context switch: read jargon → decode it → figure out what to do. That
+  defeats the point of an alert. The Polymarket Telegram pipe already
+  follows this pattern (short, readable status messages). HQ alerts must
+  match. Without code-level enforcement, every alert author (human or
+  agent) will slowly drift toward technical shorthand.
+- **How to apply:** When any new alerting path is built:
+  1. Every outgoing message goes through a `PlainAlert` (or equivalent)
+     with two REQUIRED fields: `what_happened` (plain English) and
+     `what_to_do` (one concrete action).
+  2. A jargon-linter must block banned words at construction time —
+     `threshold`, `regression`, `baseline`, `delta`, `rolling`, `stdev`,
+     `p-value`, `FP/TP`, unit shorthand (`7d`, `24h`), raw metric IDs, etc.
+  3. Metric definitions (yaml/json) must carry a `plain_language` block
+     with `what_it_means`, `why_it_matters`, `alert_template`. No metric
+     loads without it.
+  4. The template enforces the three-part shape: emoji headline →
+     what happened (1-3 plain sentences) → one clear "What to do: …".
+  5. Reference implementation lives at `~/claude-hq/watchdog/telegram.py`
+     (`PlainAlert` dataclass) and `watchdog/STYLE_GUIDE.md` (banned-word
+     list + template examples). Copy this pattern when building the next
+     alerting system.
+
+### 17. When prebuilt automation matches a task, propose — never auto-invoke without explicit approval
+- **Rule:** When any system (current or future workflow library,
+  slash-command pipeline, recipe matcher, automated retry loop, scheduled
+  action) detects that a task matches a prebuilt multi-step automation,
+  surface the match as a *proposal* and wait for explicit user confirmation
+  before invoking it. Do not silently run the automation as part of plan
+  execution. Default is always propose-and-confirm.
+- **Why:** 2026-04-24 — during the Goose recipes pilot, three paths
+  were on the table for automating `/rpi-*` dispatch: (A) full auto
+  (Commander picks + runs), (B) suggest and confirm, (C) merge into
+  Commander's default protocol. Path A was rejected because automatic
+  invocation destroys measurement integrity (no control group, can't
+  score "with recipe vs without"); Path C was premature (we hadn't
+  proven the mechanism beat the existing protocol). Path B was the
+  right shape regardless of whether the specific recipes earned their
+  keep — the principle outlives the specific case. The RPI mechanism
+  itself was dropped 2026-05-06 (zero invocations in 12 days, see
+  Rule 20), but this rule is retained because it generalises to any
+  future automation library.
+- **How to apply:**
+  1. Any code path that detects a task-to-automation match must surface
+     the match as a proposal with the matched trigger phrase shown.
+  2. Wait for explicit user confirmation before invoking. If multiple
+     matches tie, surface all of them — never silently pick.
+  3. Auto-invoke is allowed only when the user has explicitly opted into
+     auto-mode for a specific named automation (rare; not the default).
+  4. Applies forward to automation systems we haven't built yet —
+     security-audit pipelines, full-stack-initializer recipes, clean-up
+     workflows, scheduled bots. The default is always propose-and-confirm.
+
+### 18. "Note this for later" → ALWAYS go to `docs/BACKLOG.md`
+- **Rule:** Whenever the user signals that something should be tracked for
+  future work — phrases like "note this down for later", "make sure we
+  revisit this", "park this", "add to the backlog", "track this so we
+  don't forget", "we should come back to this", "save this for future" —
+  ALWAYS append the item to `~/claude-hq/docs/BACKLOG.md` using the
+  established format. Do not invent a new tracking location. Do not store
+  only in TaskCreate (session-scoped, lost at session end). Do not store
+  only in memory notes (those are about how I behave, not what work is
+  pending).
+- **Why:** 2026-05-06 — during the multi-model routing build I proposed
+  creating a new `commander/BACKLOG.md` file before checking what already
+  existed. The user (rightly) pointed out we already had
+  `docs/BACKLOG.md` (created 2026-04-22). Drift here means parked work
+  accumulates in fragmented locations: some in TaskCreate (gone next
+  session), some in memory notes, some in Watchdog reminders, some in
+  Decision Log entries. Audit trail vanishes. The point of BACKLOG.md is
+  to be the single durable register so "we should come back to X" can
+  always be looked up later.
+- **How to apply:**
+  1. Recognise the trigger phrases above (and obvious equivalents).
+  2. Read the current `docs/BACKLOG.md` to match the established format:
+     `## [Open] — YYYY-MM-DD — <title>` with What / Why / Estimate /
+     How to start / Acceptance fields. Each field non-empty.
+  3. Append to BACKLOG.md (do not insert mid-file — chronological order
+     by entry date). Items already there stay where they are; entries
+     are status-flipped (`[Open]` → `[In progress]` → `[Done]`), never
+     deleted.
+  4. Commit the BACKLOG addition. Standalone commit if not part of any
+     other work-in-progress; folded into the relevant commit if it is.
+  5. Confirm in chat: "Tracked in BACKLOG.md as item N — revisit when X."
+  6. Time-triggered reminders (cron-style "fire on date Y") still go to
+     `watchdog/reminders.json`. BACKLOG.md is the always-on register;
+     reminders.json is the alarm. Use both when both apply.
+  7. If the deferral involves an architectural decision the user already
+     made today (not just a "do later"), ALSO append a Decision Log
+     entry in the Obsidian vault with provenance tag — but BACKLOG.md
+     is still the source of truth for the work itself.
+
+### 19. Mid-complexity tasks get a brief plan-aloud before the first edit
+- **Rule:** Before the first Edit/Write/Bash that mutates code or files
+  on a task that touches 3+ files, OR explores a codebase area I haven't
+  read this session, OR is bigger than a single-line fix, include a
+  short "Plan:" block in the response: which files I expect to change,
+  in what order, what I'm uncertain about. 3-5 lines, no ceremony.
+  The user can correct the plan before any code is written.
+- **Why:** 2026-05-06 — the Goose recipes pilot shipped four `/rpi-*`
+  slash commands (research → plan → implement → iterate) on
+  2026-04-24 to enforce exactly this discipline. Twelve days later,
+  zero invocations. Three reasons: (a) the slash commands were
+  project-scoped to claude-hq cwd, invisible everywhere else; (b)
+  Commander's Step 2-6 already covers the same shape for orchestrated
+  work; (c) for non-orchestrated medium-complexity work, the user
+  reaches for conversation, not a slash command. The discipline that
+  RPI tried to enforce — research-then-plan-then-implement — is real
+  and valuable, but it's behaviour not infrastructure. Encoding it as
+  a Lesson means it lives in how I respond, not in tooling that
+  requires the user to remember another command.
+- **How to apply:**
+  1. Trigger conditions (any one is enough): touches 3+ files / explores
+     an unfamiliar codebase area this session / non-trivial logic change
+     / a refactor / changes to shared infra (hooks, scripts that fire
+     across projects).
+  2. The plan-aloud goes in the assistant text BEFORE the first
+     mutating tool call. Format: "Plan: <files I'll touch and order>.
+     <Anything I'm uncertain about>." Three to five lines is plenty;
+     more than that means the work probably warrants Commander's full
+     Step 4 mission board instead.
+  3. For trivial work (one-line fixes, typo fixes, single-file edits I
+     understand fully), skip — ceremony for ceremony's sake is its own
+     anti-pattern.
+  4. If the user pushes back on the plan, re-plan; never code through
+     a disagreement.
+
+### 20. Pilots without deadlines and measurement are vibes, not experiments
+- **Rule:** Any time we adopt a new tool, pattern, slash command,
+  recipe, agent, or framework "to see if it helps", the adoption must
+  ship with three things: (a) a hard deadline (e.g. 14 days), (b) a
+  measurable adoption signal (file existence, command-usage count,
+  watchdog metric, observable artefact), (c) a default action when
+  the deadline arrives if the signal is null. Without all three, it's
+  not a pilot — it's pre-emptive infrastructure debt that accumulates
+  silently because nobody owns the kill decision.
+- **Why:** 2026-05-06 — the 2026-04-24 Goose recipes pilot promised
+  "use one of the RPI commands on a small real task in the next week"
+  and "the watchdog will score Goose's impact on HQ metrics over the
+  next weeks." Twelve days later: zero RPI invocations, no `recipe_*`
+  watchdog metric was ever built, no kill-or-keep deadline, no
+  default action. The pilot ran in name only. The retrospective
+  conversation that surfaced this was 30+ minutes of due-diligence
+  that should have been impossible — a real pilot would have produced
+  its own verdict by deadline. The cost of un-instrumented adoption is
+  cognitive load, branch staleness, and ambient feeling of "we have
+  X" while X is dormant.
+- **How to apply:**
+  1. When proposing any new tool/pattern, the proposal must include
+     deadline + signal + default action in the same message. If it
+     doesn't, the proposal is incomplete — refuse to ship the change.
+  2. The signal must be checkable in seconds without me re-deriving
+     it. File existence, line count, sqlite query, slash-command
+     invocation grep — concrete and fast.
+  3. Default action options: drop / globalise / promote / extend.
+     Pick one. "Reassess" is not a default action; it's the same
+     un-instrumented loop again.
+  4. The watchdog is the natural home for adoption signals. If a
+     pilot's signal can be expressed as a metric, add it to
+     `watchdog/metrics.yaml` at adoption time, not "later."
+  5. Lesson 17 (propose-don't-auto-invoke) and this rule are
+     complementary: 17 governs how automation gets *triggered*, 20
+     governs how its *effectiveness* gets measured. A propose-only
+     mechanism with no measurement is half a system.

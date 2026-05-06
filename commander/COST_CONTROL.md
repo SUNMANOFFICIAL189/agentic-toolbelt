@@ -46,16 +46,17 @@ BEFORE any agent selects a tool, API, service, or dependency:
            └─ "Find cheaper" → Research deeper, report back
 ```
 
-### Model Routing (Token Cost)
+### Model Routing
 
-| Task Type | Model | Approx Cost | Use When |
-|-----------|-------|-------------|----------|
-| Simple file ops | Haiku | ~$0.001/task | Formatting, renaming, simple tests |
-| Standard coding | Sonnet | ~$0.01-0.05/task | Feature implementation, scripts |
-| Architecture/planning | Opus | ~$0.10-0.30/task | System design, decomposition |
-| Image generation | Gemini (nano-banana) | ~$0.04/image | UI assets, thumbnails |
+**See `MODEL_ROUTING.md` — that is the single source of truth for which tier handles which task shape.**
 
-**Default:** Sonnet for everything. Upgrade to Opus ONLY for planning and architecture. Downgrade to Haiku for mechanical tasks.
+This file (COST_CONTROL.md) governs *spending policy* (free-first hierarchy, user-approval gates, cost ledger format). Routing rules — task → tier mapping, hard quality floor, user overrides, quota awareness, weekly digest — live in MODEL_ROUTING.md and are enforced by `scripts/model-router.sh`.
+
+The two files share the cost ledger at `run/cost-ledger.sqlite`. Schema is defined in MODEL_ROUTING.md §8.
+
+**One-line summary of routing defaults:** mechanical work → Haiku, standard work → Sonnet, architecture / adversarial / investor / legal / security → Opus (hard floor). Override with `HQ_MODEL_OVERRIDE=…`.
+
+**Image generation** — separate concern from text-model routing. Use Gemini (nano-banana) at ~$0.04/image for UI assets and thumbnails when needed.
 
 ### Cost Ledger
 

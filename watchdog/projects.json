@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "last_updated": "2026-04-27",
+  "description": "Projects watched by the HQ Watchdog. Each entry is one project the watchdog ingests commits, sessions, and (optionally) lessons for. claude-hq is the default project \u2014 used as fallback when no project is specified, but holds no special status in the code.",
+  "projects": [
+    {
+      "name": "claude-hq",
+      "repo_path": "/Users/sunil_rajput/claude-hq",
+      "lessons_path": "commander/LESSONS.md",
+      "added": "2026-04-11",
+      "notes": "Primary HQ orchestration brain. Watched since the watchdog was first built."
+    },
+    {
+      "name": "POLYMARKET_TRADING_3.0",
+      "display_name": "PATS-Copy",
+      "repo_path": "/Users/sunil_rajput/Desktop/POLYMARKET_TRADING_3.0",
+      "lessons_path": null,
+      "added": "2026-04-27",
+      "notes": "Polymarket trading bot. name MUST match the directory basename so session-file ingestion (which uses basename) finds rows. display_name is the friendly label used in alerts. lessons_path null per Decision Log Option A \u2014 repeated_mistake_signal scoped to claude-hq lessons only for v1."
+    },
+    {
+      "name": "ai-agent-fleet-ventures",
+      "display_name": "Fleet",
+      "repo_path": "/Users/sunil_rajput/projects/ai-agent-fleet-ventures",
+      "lessons_path": "LESSONS_FLEET.md",
+      "added": "2026-04-27",
+      "notes": "Autonomous agent portfolio with Darwinian mortality. Mission Control fork at dashboard/mission-control-fleet/ tracked separately as subrepo (its own git remote, not part of this project's commits). Paperclip control plane evaluated 2026-04-27 \u2014 pivot decision pending. lessons_path points to project-local LESSONS_FLEET.md (separate from HQ-wide commander/LESSONS.md per brief)."
+    }
+  ]
+}
