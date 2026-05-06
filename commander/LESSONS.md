@@ -244,38 +244,35 @@
      list + template examples). Copy this pattern when building the next
      alerting system.
 
-### 17. When recipes match, propose — never auto-invoke without explicit approval
-- **Rule:** When Commander's Step 2 RECIPE DETECTION matches a task against
-  one or more recipes in `registry.json`, surface the top-ranked recipe as
-  a *proposal* in the MISSION_BOARD and wait for an explicit user reply
-  ("rpi" to use, "freehand" to skip, "describe more" to add context)
-  before invoking it. Do not silently run the recipe as part of plan
-  execution. This applies to all recipe families, not just the current
-  RPI set.
-- **Why:** 2026-04-24 — during the Goose recipes pilot, Sunil and I
-  considered three paths for automating `/rpi-*` dispatch: (A) full auto
-  (Commander picks + runs), (B) suggest and confirm, (C) merge RPI into
-  Commander's default protocol. Path A was rejected because it destroys
-  the pilot's measurement integrity — the watchdog can only score
-  "with recipe vs without" if there are sessions of each kind, and
-  auto-invocation removes the control group. Path C was rejected as
-  premature; we haven't proven RPI is better than Commander's current
-  protocol and merging conflates experiment with tool. Path B preserves
-  the choice point, which is the only way to get a clean evidence loop.
+### 17. When prebuilt automation matches a task, propose — never auto-invoke without explicit approval
+- **Rule:** When any system (current or future workflow library,
+  slash-command pipeline, recipe matcher, automated retry loop, scheduled
+  action) detects that a task matches a prebuilt multi-step automation,
+  surface the match as a *proposal* and wait for explicit user confirmation
+  before invoking it. Do not silently run the automation as part of plan
+  execution. Default is always propose-and-confirm.
+- **Why:** 2026-04-24 — during the Goose recipes pilot, three paths
+  were on the table for automating `/rpi-*` dispatch: (A) full auto
+  (Commander picks + runs), (B) suggest and confirm, (C) merge into
+  Commander's default protocol. Path A was rejected because automatic
+  invocation destroys measurement integrity (no control group, can't
+  score "with recipe vs without"); Path C was premature (we hadn't
+  proven the mechanism beat the existing protocol). Path B was the
+  right shape regardless of whether the specific recipes earned their
+  keep — the principle outlives the specific case. The RPI mechanism
+  itself was dropped 2026-05-06 (zero invocations in 12 days, see
+  Rule 20), but this rule is retained because it generalises to any
+  future automation library.
 - **How to apply:**
-  1. In `commander/COMMANDER.md` Step 2 RECIPE DETECTION, the final
-     branch **must** be "WAIT for user confirmation" — not "invoke".
-  2. When the proposal is shown, include the matched trigger phrase so
-     the user can judge whether the match was correct.
-  3. If multiple recipes match with equal strength, use `trigger_priority`
-     (lower = stronger) from `registry.json` as the tiebreaker. If still
-     tied, surface all tied recipes to the user, don't silently pick.
-  4. This rule can be revisited *only* when the watchdog has at least 3
-     weeks of pilot data showing a recipe family produces consistently
-     better outcomes than freehand. Until then, the proposal gate stays.
-  5. The same principle applies if and when we add new recipe families
-     (security-audit, full-stack-initializer, clean-up-feature-flag,
-     etc.) — the default is always propose-and-confirm, never auto-run.
+  1. Any code path that detects a task-to-automation match must surface
+     the match as a proposal with the matched trigger phrase shown.
+  2. Wait for explicit user confirmation before invoking. If multiple
+     matches tie, surface all of them — never silently pick.
+  3. Auto-invoke is allowed only when the user has explicitly opted into
+     auto-mode for a specific named automation (rare; not the default).
+  4. Applies forward to automation systems we haven't built yet —
+     security-audit pipelines, full-stack-initializer recipes, clean-up
+     workflows, scheduled bots. The default is always propose-and-confirm.
 
 ### 18. "Note this for later" → ALWAYS go to `docs/BACKLOG.md`
 - **Rule:** Whenever the user signals that something should be tracked for
@@ -315,3 +312,76 @@
      made today (not just a "do later"), ALSO append a Decision Log
      entry in the Obsidian vault with provenance tag — but BACKLOG.md
      is still the source of truth for the work itself.
+
+### 19. Mid-complexity tasks get a brief plan-aloud before the first edit
+- **Rule:** Before the first Edit/Write/Bash that mutates code or files
+  on a task that touches 3+ files, OR explores a codebase area I haven't
+  read this session, OR is bigger than a single-line fix, include a
+  short "Plan:" block in the response: which files I expect to change,
+  in what order, what I'm uncertain about. 3-5 lines, no ceremony.
+  The user can correct the plan before any code is written.
+- **Why:** 2026-05-06 — the Goose recipes pilot shipped four `/rpi-*`
+  slash commands (research → plan → implement → iterate) on
+  2026-04-24 to enforce exactly this discipline. Twelve days later,
+  zero invocations. Three reasons: (a) the slash commands were
+  project-scoped to claude-hq cwd, invisible everywhere else; (b)
+  Commander's Step 2-6 already covers the same shape for orchestrated
+  work; (c) for non-orchestrated medium-complexity work, the user
+  reaches for conversation, not a slash command. The discipline that
+  RPI tried to enforce — research-then-plan-then-implement — is real
+  and valuable, but it's behaviour not infrastructure. Encoding it as
+  a Lesson means it lives in how I respond, not in tooling that
+  requires the user to remember another command.
+- **How to apply:**
+  1. Trigger conditions (any one is enough): touches 3+ files / explores
+     an unfamiliar codebase area this session / non-trivial logic change
+     / a refactor / changes to shared infra (hooks, scripts that fire
+     across projects).
+  2. The plan-aloud goes in the assistant text BEFORE the first
+     mutating tool call. Format: "Plan: <files I'll touch and order>.
+     <Anything I'm uncertain about>." Three to five lines is plenty;
+     more than that means the work probably warrants Commander's full
+     Step 4 mission board instead.
+  3. For trivial work (one-line fixes, typo fixes, single-file edits I
+     understand fully), skip — ceremony for ceremony's sake is its own
+     anti-pattern.
+  4. If the user pushes back on the plan, re-plan; never code through
+     a disagreement.
+
+### 20. Pilots without deadlines and measurement are vibes, not experiments
+- **Rule:** Any time we adopt a new tool, pattern, slash command,
+  recipe, agent, or framework "to see if it helps", the adoption must
+  ship with three things: (a) a hard deadline (e.g. 14 days), (b) a
+  measurable adoption signal (file existence, command-usage count,
+  watchdog metric, observable artefact), (c) a default action when
+  the deadline arrives if the signal is null. Without all three, it's
+  not a pilot — it's pre-emptive infrastructure debt that accumulates
+  silently because nobody owns the kill decision.
+- **Why:** 2026-05-06 — the 2026-04-24 Goose recipes pilot promised
+  "use one of the RPI commands on a small real task in the next week"
+  and "the watchdog will score Goose's impact on HQ metrics over the
+  next weeks." Twelve days later: zero RPI invocations, no `recipe_*`
+  watchdog metric was ever built, no kill-or-keep deadline, no
+  default action. The pilot ran in name only. The retrospective
+  conversation that surfaced this was 30+ minutes of due-diligence
+  that should have been impossible — a real pilot would have produced
+  its own verdict by deadline. The cost of un-instrumented adoption is
+  cognitive load, branch staleness, and ambient feeling of "we have
+  X" while X is dormant.
+- **How to apply:**
+  1. When proposing any new tool/pattern, the proposal must include
+     deadline + signal + default action in the same message. If it
+     doesn't, the proposal is incomplete — refuse to ship the change.
+  2. The signal must be checkable in seconds without me re-deriving
+     it. File existence, line count, sqlite query, slash-command
+     invocation grep — concrete and fast.
+  3. Default action options: drop / globalise / promote / extend.
+     Pick one. "Reassess" is not a default action; it's the same
+     un-instrumented loop again.
+  4. The watchdog is the natural home for adoption signals. If a
+     pilot's signal can be expressed as a metric, add it to
+     `watchdog/metrics.yaml` at adoption time, not "later."
+  5. Lesson 17 (propose-don't-auto-invoke) and this rule are
+     complementary: 17 governs how automation gets *triggered*, 20
+     governs how its *effectiveness* gets measured. A propose-only
+     mechanism with no measurement is half a system.
