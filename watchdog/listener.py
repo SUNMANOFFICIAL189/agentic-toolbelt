@@ -469,7 +469,10 @@ def _send_heartbeat() -> None:
             if line.startswith("HC_PING_LISTENER="):
                 url = line.split("=", 1)[1].strip().strip("'\"")
                 if url:
-                    urllib.request.urlopen(url, timeout=5)
+                    # Reuse telegram.py's SSL context — Mac stock Python lacks
+                    # the system cert path so urlopen would otherwise fail with
+                    # CERTIFICATE_VERIFY_FAILED.
+                    urllib.request.urlopen(url, timeout=5, context=_build_ssl_context())
                 return
     except Exception:  # noqa: BLE001 — heartbeat must never crash the listener
         pass
