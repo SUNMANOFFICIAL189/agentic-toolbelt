@@ -402,6 +402,49 @@
 
 ---
 
+## [Open] — 2026-05-07 — PATS-Copy: SELL-aware position sizing (max-loss cap, not just dollar cap)
+
+**What:** Position sizer currently treats every trade as if max-loss = dollar amount committed. That is true for BUY (size = max-loss) but false for SELL (max-loss = (1 − entry_price) × shares = much larger when entry is low). On 2026-05-07 a $75 SELL at entry 0.041 carried up to $1,754 max-loss exposure and stopped out at −$943 in a single event — 12.5× the position dollar amount. Add a SELL-aware sizing rule that caps max-loss as a fraction of portfolio (e.g., MAX_LOSS_PCT_PER_TRADE = 1.5% of equity) and reduces size when entry price is low.
+
+**Why:** Surfaced 2026-05-07 Phase A balance investigation. The −$943 single-trade loss accounts for ~97% of the −$976 PnL swing in 11h. Side-aware stop-loss fix (`ef206c1`) is correct but only kicks in at 30% adverse — by then a low-entry SELL has already lost multiples of its size. Pre-fix, this risk was hidden because stop-loss never fired on losing SELLs at all. Sizing-aware-of-side is the structural answer; tuning stop-loss thresholds alone can't fix asymmetric SELL risk.
+
+**Estimate:** 2-3 days. Touches `risk-manager.ts` sizing logic + new MAX_LOSS_PCT config + tests + verification of sizing on actual signal-bot historical sample.
+
+**How to start:**
+1. Compute `max_loss_per_share = (1 − entry_price)` for SELL, `entry_price` for BUY.
+2. Compute `max_position_loss = max_loss_per_share × shares`.
+3. Add config `MAX_LOSS_PCT_PER_TRADE` (start 1.5%, tunable).
+4. In sizing path: cap `our_size` so `max_position_loss ≤ MAX_LOSS_PCT_PER_TRADE × current_balance`.
+5. Backtest against last 14 days of signal-bot SELL trades — does the cap reject the catastrophic sizes while letting normal trades through?
+6. Watchdog Tier 1 rule (Phase B): static check for any code path that opens positions without computing max-loss.
+
+**Acceptance:** No SELL position can be opened where `(1 − entry_price) × shares > 1.5% × balance`. Catastrophic loss class (>5% balance hit per single trade) becomes structurally impossible.
+
+**Connection:** Independent of Signal v2 (Phase C) and proportional-sizing (item above) but should ship before either if sizing math is being touched anyway.
+
+---
+
+## [Open] — 2026-05-07 — PATS-Copy: Supabase pnl-write reliability (audit-trail gap)
+
+**What:** Stop-loss closures sometimes don't write `pnl` back to Supabase — the row stays at `pnl=0` while the bot's in-memory state has the real loss. Sample of 30 low-priced SELL stops in last 7 days: 11 (37%) have `pnl=0` in db. Includes the 2026-05-07 −$943 BTC-80k trade. Bot's in-memory accounting is the truth (balance + .bot-status.json reflect real losses), but the audit trail in `copy_trades` is incomplete. All-time `sum(pnl)` from db = +$158 vs bot reports −$767 → $925 audit gap.
+
+**Why:** Surfaced during 2026-05-07 Phase A. Three downstream effects: (1) reconstruction queries (e.g., this Phase A investigation) undercount losses and create false-positive "regression" signals; (2) dashboard PnL is wrong because it reads db; (3) any future hydration-from-Supabase will mis-restore balance after restart — the bot only computes correct balance now because it had the right state in-memory. A fresh restart-from-cold could reload at the wrong balance.
+
+**Estimate:** 1-2 days. Investigate which close path skips the pnl write (likely reconciliation orphan-close vs primary-path closure), add pnl to those writes, backfill the existing 11 known-bad rows.
+
+**How to start:**
+1. Diff the three close paths: `closeTrade` (paper-trading.ts:145), `closeTradeByMarketId` (paper-trading.ts:176), reconciliation orphan-close (somewhere in runner.ts or a reconciler).
+2. Find which path doesn't call `updateCopyTrade({pnl})` or where the pnl arg is missing.
+3. Fix the missing write.
+4. Backfill: write a one-shot script that pulls in-memory closedTrades from a recent bot status snapshot (or recomputes from entry/exit price + size) and updates the 11 rows with correct pnl.
+5. Watchdog Tier 1 rule (Phase B): runtime check that flags any `copy_trades.status='stopped'` row with `pnl=0` and `our_size > 0` (impossible state — a stop-loss closure should always have a non-zero pnl).
+
+**Acceptance:** No new `status=stopped` rows with `pnl=0` after fix deploys. Existing 11 rows backfilled. Bot's in-memory PnL matches `sum(pnl)` from db within $5 tolerance.
+
+**Connection:** Pairs naturally with the sizing item above — together they're "make the SELL accounting trustworthy." Watchdog runtime rule from this item directly supports Phase B step 3.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
