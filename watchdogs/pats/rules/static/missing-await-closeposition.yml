@@ -1,0 +1,41 @@
+rules:
+  - id: pats-missing-await-closeposition
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      copyExecutor.closePosition and signalExecutor.closePosition are async
+      (return Promise<CopyTrade | null> / Promise<Trade | null>). Calling them
+      without `await` captures a Promise object — which is always truthy.
+      Any subsequent `if (result)` check passes regardless of how the Promise
+      resolves, masking the fall-through to the other executor.
+
+      This was 2026-05-07 Bug B inside the lifecycle's closePosition closure
+      in runner.ts. Combined with copy-executor.ts:548 returning null when
+      the marketId wasn't tracked, it caused the trade to close in memory
+      without persisting to Supabase — directly producing the −$943 audit
+      gap.
+
+      Fix: make the enclosing function async (or arrow), prefix with await.
+        const copy = await this.copyExecutor.closePosition(...);
+        if (copy) return copy;
+        return await this.signalExecutor.closePosition(...);
+    paths:
+      include:
+        - "runner.ts"
+        - "position-lifecycle.ts"
+    pattern-either:
+      # Pattern 1: assigned to a variable without await
+      - patterns:
+          - pattern: const $X = $OBJ.closePosition($A, $B, $C);
+          - pattern-not: const $X = await $OBJ.closePosition($A, $B, $C);
+      # Pattern 2: returned without await (the dead-code branch in original Bug B)
+      - patterns:
+          - pattern: return $OBJ.closePosition($A, $B, $C);
+          - pattern-not: return await $OBJ.closePosition($A, $B, $C);
+      # Pattern 3: returned with `as any` cast (the actual shape that masked the type error)
+      - patterns:
+          - pattern: return $OBJ.closePosition($A, $B, $C) as any;
+          - pattern-not: return (await $OBJ.closePosition($A, $B, $C)) as any;
+    metadata:
+      category: correctness
+      pattern-source: "git show 58d8257 -- src/core/runner.ts"
