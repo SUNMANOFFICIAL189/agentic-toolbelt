@@ -456,6 +456,8 @@
 
 **Audit gap closed:** db sum(pnl) was +$158.14, after backfill: −$785.08. Bot's pre-restart in-memory pnl was −$767.15 → residual gap ~$18 (acceptable, attributable to the 44 unrecoverable rows).
 
+**2026-05-08 update — Layer 3 follow-up shipped:** Fixed the secondary pnl=0 source at PATS-Copy commit `6ef3553` (branch `fix/reconciliation-pnl-truthful`). The 15-minute reconciliation routine was overwriting orphan rows with `pnl=0` when its market-cache lookup missed (cache misses happen for resolved markets, slug/condition_id mismatches, or fresh fetches). New three-layer fallback: (1) read pnl from `paperEngine.getClosedTrades()` first — handles the common case where bot hasn't restarted between close and reconciliation, (2) MarketCache lookup as before, (3) leave `pnl` as null (skip the column update entirely) and Telegram-alert the user to investigate. The historical 44 unrecoverable rows are unaffected; this prevents new ones from being created. After this fix, every pnl=0 row in the audit log is intentional history, not future drift.
+
 **Original entry (kept for audit trail):**
 
 **What:** Stop-loss closures sometimes don't write `pnl` back to Supabase — the row stays at `pnl=0` while the bot's in-memory state has the real loss. Sample of 30 low-priced SELL stops in last 7 days: 11 (37%) have `pnl=0` in db. Includes the 2026-05-07 −$943 BTC-80k trade. Bot's in-memory accounting is the truth (balance + .bot-status.json reflect real losses), but the audit trail in `copy_trades` is incomplete. All-time `sum(pnl)` from db = +$158 vs bot reports −$767 → $925 audit gap.
