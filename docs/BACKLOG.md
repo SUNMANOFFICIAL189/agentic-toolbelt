@@ -402,7 +402,29 @@
 
 ---
 
-## [Open] — 2026-05-07 — PATS-Copy: SELL-aware position sizing (max-loss cap, not just dollar cap)
+## [Done] — 2026-05-08 — PATS-Copy: SELL-aware position sizing (max-loss cap, not just dollar cap)
+
+**Resolved:** Two-part rule shipped at PATS-Copy commit `935d44f` (branch `fix/sell-aware-sizing` merged to `strategy/buy-optimization`):
+
+1. **SELL entry-price floor at $0.05** (`MIN_SELL_ENTRY_PRICE`) — added to `signal-executor.ts` after the existing `MIN_SIGNAL_ENTRY_PRICE` check. Calibrated against 116 historical signal-bot SELLs: the ≤$0.05 bucket accumulated −$840 (driven by a single −$943 event) while $0.05–$0.10 bucket was +$104 with no large losses. Floor removes the catastrophic class while preserving the profitable mid-cheap one.
+
+2. **5% max-loss-per-trade cap** (`MAX_LOSS_PCT_PER_TRADE`) — new `RiskManager.capByMaxLoss()` helper. Computes `max_loss_per_share = (1 − entry)` for SELL, `entry` for BUY. Reduces size if the would-be max-loss exceeds 5% of current balance; rejects entirely if reduction drops below $5 economic floor. Wired into both `signal-executor.ts` and `copy-executor.ts` as the final size step before execute.
+
+**Backtest** against 156 historical signal-bot trades at $5,289 balance:
+- Floor-rejected: 32 (avoid −$840 of historical losses)
+- Cap-rejected: 0 (floor catches all catastrophic-class first)
+- Size-reduced: 25 (small drag: +$16 → −$31 after scaling)
+- Untouched: 99 (+$371 unchanged)
+- Counterfactual outcome: −$452 → +$340 = **+$792 improvement**
+- The 2026-05-07 −$943 BTC trade: FLOOR-REJECTED ✓
+
+**Originally proposed cap was 1.5%; recalibrated to 5% during analysis.** User pushed back on the 1.5% cap as drastic for what looked like a "blue moon" event; the data showed that while catastrophic events ARE rare (1 in 50 cheap SELLs, ~2%), the strategy is still net-negative because each rare event wipes ~50 small wins. The right line was at the entry-price bucket, not at a portfolio-percentage. 5% serves as a backstop for outsized exposures in $0.05–$0.10 range without rejecting the profitable bucket entirely.
+
+**Connection to other 2026-05-08 work:** Together with Phase C Signal v2 (BUY drop + SELL <24h cap) and the pnl-write reliability fix (commit 58d8257), the structural conditions that produced the −$943 event no longer exist in any layer — accounting accurate, sizing capped, position lifetime bounded. Phase G live-trading no longer blocked by this class of risk.
+
+**Original entry (kept for audit trail):**
+
+## [Open — historical] — 2026-05-07 — PATS-Copy: SELL-aware position sizing (max-loss cap, not just dollar cap)
 
 **What:** Position sizer currently treats every trade as if max-loss = dollar amount committed. That is true for BUY (size = max-loss) but false for SELL (max-loss = (1 − entry_price) × shares = much larger when entry is low). On 2026-05-07 a $75 SELL at entry 0.041 carried up to $1,754 max-loss exposure and stopped out at −$943 in a single event — 12.5× the position dollar amount. Add a SELL-aware sizing rule that caps max-loss as a fraction of portfolio (e.g., MAX_LOSS_PCT_PER_TRADE = 1.5% of equity) and reduces size when entry price is low.
 
