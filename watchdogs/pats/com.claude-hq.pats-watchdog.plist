@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  PATS-Copy Architectural Watchdog (Tier 1)
+
+  NOT auto-loaded. To install:
+    cp ~/claude-hq/watchdogs/pats/com.claude-hq.pats-watchdog.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.claude-hq.pats-watchdog.plist
+    launchctl kickstart -k gui/$(id -u)/com.claude-hq.pats-watchdog
+
+  To uninstall:
+    launchctl bootout gui/$(id -u)/com.claude-hq.pats-watchdog
+    rm ~/Library/LaunchAgents/com.claude-hq.pats-watchdog.plist
+
+  First 14 days: observe-only soak (--soak flag). After soak, change --soak to --active.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claude-hq.pats-watchdog</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/sunil_rajput/claude-hq/watchdogs/pats/orchestrator.py</string>
+    <string>--soak</string>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/sunil_rajput/claude-hq/watchdogs/pats/launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/sunil_rajput/claude-hq/watchdogs/pats/launchd.err.log</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/sunil_rajput/claude-hq/watchdogs/pats</string>
+
+  <key>StartInterval</key>
+  <integer>1800</integer>
+
+  <key>LowPriorityIO</key>
+  <true/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

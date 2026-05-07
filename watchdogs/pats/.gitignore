@@ -1,0 +1,13 @@
+# Runtime artifacts
+audit.log
+baseline.json
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.python-version
+
+# OS
+.DS_Store
