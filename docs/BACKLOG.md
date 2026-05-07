@@ -424,7 +424,17 @@
 
 ---
 
-## [Open] — 2026-05-07 — PATS-Copy: Supabase pnl-write reliability (audit-trail gap)
+## [Done] — 2026-05-08 — PATS-Copy: Supabase pnl-write reliability (audit-trail gap)
+
+**Resolved:** Code fix at PATS-Copy commit `58d8257` (branch `fix/pnl-write-reliability` merged to `strategy/buy-optimization`). Two compound bugs:
+- `copy-executor.ts:548` — closePosition called paperEngine.closeTradeByMarketId regardless of whether the marketId was tracked in this.openCopyTrades. For signal-bot trades (owned by signalExecutor per c0e44b9), the trade closed in paperEngine but the function returned null. Added an early-return guard.
+- `runner.ts:168` — lifecycle closePosition closure wasn't async-aware. `if (copy)` checked the Promise (always truthy), so signalExecutor branch was dead code. Added async + await.
+
+**Backfill:** `~/claude-hq/watchdogs/pats/scripts/backfill_pnl_writes.py` ran on 2026-05-08. 46 suspect rows total; 2 recoverable from PM2 logs (BTC-80k −$943.04, US-Iran-war −$0.18), applied. 44 unrecoverable (pre-2026-05-06 logs rotated, or reconciliation-only closures with no log line). Per user 2026-05-08 decision: leave the 44 at pnl=0; code fix prevents new occurrences.
+
+**Audit gap closed:** db sum(pnl) was +$158.14, after backfill: −$785.08. Bot's pre-restart in-memory pnl was −$767.15 → residual gap ~$18 (acceptable, attributable to the 44 unrecoverable rows).
+
+**Original entry (kept for audit trail):**
 
 **What:** Stop-loss closures sometimes don't write `pnl` back to Supabase — the row stays at `pnl=0` while the bot's in-memory state has the real loss. Sample of 30 low-priced SELL stops in last 7 days: 11 (37%) have `pnl=0` in db. Includes the 2026-05-07 −$943 BTC-80k trade. Bot's in-memory accounting is the truth (balance + .bot-status.json reflect real losses), but the audit trail in `copy_trades` is incomplete. All-time `sum(pnl)` from db = +$158 vs bot reports −$767 → $925 audit gap.
 
