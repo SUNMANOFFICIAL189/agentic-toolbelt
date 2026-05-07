@@ -378,6 +378,30 @@
 
 ---
 
+## [Open] — 2026-05-07 — Re-evaluate `uzucky/watchdog-ai` if it matures
+
+**What:** [uzucky/watchdog-ai](https://github.com/uzucky/watchdog-ai) is a Python runtime verification framework with 6 check types (process, freshness, log_scan, assertion, http, script) that map closely to what we need for the architectural watchdog. Discovered during 2026-05-07 PATS-Copy session research. Not adopted because of Trust Gate concerns: 0 stars, 1 contributor, 1-month-old (created March 2026). Per Lessons 1-2, unproven solo-dev tools are high-risk for production trading bot monitoring.
+
+**Why:** If the project gains traction (≥50 stars, ≥5 contributors, ≥6 months operating cleanly), it becomes a genuine candidate. Its 6 check types are well-designed for AI-built systems and could replace much of our custom rule-runner work. Saves us long-term maintenance if we adopt a maintained upstream rather than rolling our own.
+
+**Estimate:** 1-2 hours re-evaluation when triggered. Trust Gate Tier C if adopted (Magika scan, secret scan, Socket dependency check, reputation review).
+
+**How to start (when triggered):**
+1. Re-check stars/contributors/release cadence at https://github.com/uzucky/watchdog-ai
+2. If Trust Gate passes, prototype against 1-2 of our existing PATS-Copy watchdog rules — does it catch the same issues our custom rules do?
+3. If it works, evaluate migrating from custom Python checks → watchdog-ai checks
+4. Decision: keep custom (safer), migrate (less maintenance), or hybrid
+
+**Trigger conditions to re-evaluate** (any one):
+- watchdog-ai gains 50+ stars
+- watchdog-ai has stable commit cadence > 6 months
+- We're maintaining 10+ custom runtime rules and need a framework
+- We're spawning 2+ project-native watchdogs and need shared tooling
+
+**Acceptance:** Either we adopt watchdog-ai (replacing our custom Python scripts) and back-port any specific rules upstream, OR we document why it doesn't fit and stop revisiting.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
