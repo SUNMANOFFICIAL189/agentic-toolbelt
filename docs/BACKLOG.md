@@ -338,6 +338,46 @@
 
 ---
 
+## [Open] — 2026-05-07 — PATS-Copy: proportional sizing for copy-trader
+
+**What:** Currently the copy-executor opens every copied position at a flat $20–$100 regardless of how much the leader put on. Leaders make money via asymmetric sizing — small probes ($50) when uncertain, big conviction bets ($5k–$20k) when sure. Their winning trades are large; their losing trades are small. Net positive. Flat-sized copying produces the leader's hit rate without the asymmetric upside, leading to net losses even on profitable leaders.
+
+**Why:** Empirically demonstrated on 2026-05-07. Wallet `0x2005d16a...` has +$151k lifetime realized PnL on Polymarket. We copied 92 of their trades at flat sizing → our PnL on that subset: −$811 with 17.4% WR. Mean entry slippage was 0.32% (negligible). Stop-loss flushed only 4/92 trades. The remaining 88 closed naturally — same direction, similar entry, similar exit, but we lost $888. Conclusion: their edge is asymmetric sizing; flat sizing destroys it.
+
+**Estimate:** 3–5 days. Real engineering work — touches risk-manager, copy-executor sizing logic, capital concentration safeguards.
+
+**How to start (after convergence-copy is validated and shipped):**
+1. Pull leader's recent bet-size distribution via `data-api.polymarket.com/positions?user=X` → for each position, `totalBought` / leader's portfolio value gives bet-as-fraction-of-portfolio
+2. Add `our_size_factor` to copy-executor: `our_position = our_portfolio × leader_position_pct × scaling_factor`
+3. Cap at risk-manager limits — never let any single copy exceed `MAX_POSITION_PCT` of our portfolio (e.g., 20%)
+4. Backtest combined with convergence-copy filter: do convergence-confirmed + proportional-sized copies turn the strategy net-positive?
+5. If validated, ship behind a feature flag (`PROPORTIONAL_SIZING=true`) so it's reversible
+
+**Acceptance:** Backtest shows PnL improvement vs flat-sizing baseline of at least +$0.50/trade on the same 714 historical trades, with no single position exceeding `MAX_POSITION_PCT` of capital.
+
+**Connection to other items:** Should ship AFTER convergence-copy (item below) is validated, because convergence-copy filters to higher-conviction trades and proportional sizing amplifies the captured edge. Together they're the two halves of "capture leader edge."
+
+---
+
+## [Open] — 2026-05-07 — PATS-Copy: convergence-copy filter (validate via backtest first)
+
+**What:** Currently copy-executor copies any tracked leader's move when filters pass. Proposed: only copy when 2+ tracked leader wallets independently trade the same market in the same direction within a 30-min window — i.e., consensus among smart-money traders, not single-wallet noise.
+
+**Why:** Wisdom-of-crowds principle — N independent skilled traders converging on a position is statistically a stronger signal than any single trader acting alone. Used in equity markets (13F filings consensus), crypto whale tracking. Should filter copy trades to high-conviction moments and avoid "probe" trades.
+
+**Estimate:** Validation backtest 1 day; if validated, build 1–2 days. If not validated, abandon (Lesson 20).
+
+**How to start:**
+1. **Validation phase (1 day)** — replay our 714 historical copy_trades. For each, check if 2+ DIFFERENT leader wallets traded the same market within 30 min before our entry. Tag as "convergence-confirmed" vs "single-wallet". Compare PnL distributions.
+2. Pre-committed test parameters (anti-overfit): 30-min window, 2+ distinct wallets, exact market match, same side direction.
+3. **Independence check** — also measure time gaps between first-mover and second-mover. If consistently <60s → wallets are correlated (1 alpha + copytraders), not independent. Convergence isn't real signal in that case.
+4. **If validated** — build convergence detector module that maintains rolling 30-min window of leader trades, fires "convergence" event when 2+ wallets align, copy-executor only acts on convergence events (not single-wallet events).
+5. **If not validated** — drop the idea. Combine with proportional sizing as Phase 5 enhancement instead.
+
+**Acceptance:** Convergence-confirmed copies show PnL > 0 across the historical sample, AND meaningfully better PnL/trade than single-wallet copies, AND wallets pass independence check (median gap > 5 min between first and second mover).
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
