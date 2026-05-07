@@ -1,0 +1,44 @@
+rules:
+  - id: pats-copy-executor-receiving-signal-bot
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      `copyExecutor.hydrateOpenTrades(...)` is being called with rows that
+      may include signal-bot trades. signal-bot trades are owned by
+      signalExecutor ONLY — duplicating them in copyExecutor causes
+      lifecycle close paths to misattribute the close, leaving
+      signalExecutor.recentlyClosedMarkets cooldown unset. The next signal
+      on the same market re-opens it within the 15-min cooldown window,
+      creating a duplicate Supabase "open" row.
+
+      Calibrated against 2026-05-07 fix c0e44b9. Always filter:
+        const copyOnly = openRows.filter(r => r.leader_wallet !== 'signal-bot');
+        copyExecutor.hydrateOpenTrades(copyOnly);
+    paths:
+      include:
+        - "runner.ts"
+        - "copy-executor.ts"
+    pattern-either:
+      # Direct pass of unfiltered openRows / data / rows
+      - patterns:
+          - pattern: $E.copyExecutor.hydrateOpenTrades($ROWS)
+          - pattern-not: $E.copyExecutor.hydrateOpenTrades($ROWS.filter(...))
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot');
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot");
+              ...
+      # Same shape but called on `this.copyExecutor`
+      - patterns:
+          - pattern: this.copyExecutor.hydrateOpenTrades($ROWS)
+          - pattern-not: this.copyExecutor.hydrateOpenTrades($ROWS.filter(...))
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot');
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot");
+              ...
+    metadata:
+      category: correctness
+      pattern-source: "git show c0e44b9 -- src/core/runner.ts"

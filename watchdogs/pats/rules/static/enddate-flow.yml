@@ -1,0 +1,62 @@
+rules:
+  - id: pats-trade-missing-enddate
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Trade-shape object literal is missing `endDate`. Bug class: hydration or
+      fresh-execution paths drop endDate, causing PositionLifecycle.checkTTL to
+      fall back to MAX_POSITION_AGE_MS (24h) regardless of the market's actual
+      resolution date. This silently flushes positions whose markets resolve
+      weeks/months out.
+
+      Calibrated against 2026-05-07 fixes 730a85f (paper engine) and f80fd08
+      (hydration). Both paths now must propagate endDate.
+
+      Fix: add `endDate: $SOURCE.endDate` (or `endDate: input.endDate`,
+      `endDate: signal.market.endDate`, etc.) to the Trade literal.
+
+      Known-deferred: paper-trading.hydrateFromSupabase reconstructs Trade from
+      Supabase rows that lack an endDate column. signal-bot trades get endDate
+      back via runner.ts injectOpenTrade after Gamma fetch; copy-trader rows
+      don't (KNOWN GAP per 730a85f commit msg, dormant while copy-trading is
+      idle). Rule excludes hydrateFromSupabase explicitly to avoid noise.
+    paths:
+      include:
+        - "paper-trading.ts"
+        - "runner.ts"
+        - "signal-executor.ts"
+        - "copy-executor.ts"
+    pattern-either:
+      # Pattern A: Trade literal in fresh-execution path (has access to input/signal)
+      - patterns:
+          - pattern: |
+              const $T: Trade = {
+                ...,
+                entryTime: $E,
+                ...
+              }
+          - pattern-not: |
+              const $T: Trade = {
+                ...,
+                endDate: $D,
+                ...
+              }
+          - pattern-not-inside: |
+              async hydrateFromSupabase(...): $RT { ... }
+      # Pattern B: injectOpenTrade arg literal (caller must propagate endDate)
+      - patterns:
+          - pattern: |
+              $X.injectOpenTrade({
+                ...,
+                entryTime: $E,
+                ...
+              })
+          - pattern-not: |
+              $X.injectOpenTrade({
+                ...,
+                endDate: $D,
+                ...
+              })
+    metadata:
+      category: correctness
+      pattern-source: "git show 730a85f f80fd08 -- src/"

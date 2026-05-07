@@ -1,0 +1,73 @@
+rules:
+  - id: pats-side-blind-loss-formula
+    languages: [typescript]
+    severity: ERROR
+    message: |
+      Loss/PnL formula appears side-blind. The convention in this codebase:
+        BUY:  loss when price falls  → (entry - current) / entry
+        SELL: loss when price rises  → (current - entry) / entry
+      Both formulas should be wrapped in a `trade.side === 'buy' ? ... : ...`
+      ternary, OR delegate to `risk-manager.calculatePnl` which is already
+      side-aware.
+
+      Calibrated against 2026-05-07 fix ef206c1. The pre-fix code in
+      position-lifecycle.checkStopLosses used the BUY formula for all sides,
+      which silently let losing SELLs ride past the stop-loss threshold (math
+      went negative on adverse SELL moves and never crossed the trigger). One
+      such trade closed for -$943 on 2026-05-07 when the side-aware fix
+      surfaced the accumulated tail risk in a single event.
+    paths:
+      include:
+        - "position-lifecycle.ts"
+        - "risk-manager.ts"
+        - "copy-executor.ts"
+        - "signal-executor.ts"
+      exclude:
+        - "*.test.ts"
+        - "*.spec.ts"
+    pattern-either:
+      # Bug shape A: BUY formula used unconditionally on price-flavored vars
+      - patterns:
+          - pattern: ($ENTRY - $CURRENT) / $ENTRY
+          - metavariable-regex:
+              metavariable: $ENTRY
+              regex: '^(entry|entryPrice|ourEntryPrice|leaderEntryPrice|entry_price)$'
+          - metavariable-regex:
+              metavariable: $CURRENT
+              regex: '^(current|currentPrice|exit|exitPrice|price)$'
+          - pattern-not-inside: |
+              $X.side === 'buy' ? ... : ...
+          - pattern-not-inside: |
+              $X.side === "buy" ? ... : ...
+          - pattern-not-inside: |
+              if ($X.side === 'buy') { ... }
+          - pattern-not-inside: |
+              if ($X.side === "buy") { ... }
+          - pattern-not-inside: |
+              switch ($X.side) { ... }
+          - pattern-not-inside: |
+              calculatePnl(...)
+      # Bug shape B: SELL formula used unconditionally (mirror of A)
+      - patterns:
+          - pattern: ($CURRENT - $ENTRY) / $ENTRY
+          - metavariable-regex:
+              metavariable: $ENTRY
+              regex: '^(entry|entryPrice|ourEntryPrice|leaderEntryPrice|entry_price)$'
+          - metavariable-regex:
+              metavariable: $CURRENT
+              regex: '^(current|currentPrice|exit|exitPrice|price)$'
+          - pattern-not-inside: |
+              $X.side === 'buy' ? ... : ...
+          - pattern-not-inside: |
+              $X.side === "buy" ? ... : ...
+          - pattern-not-inside: |
+              if ($X.side === 'buy') { ... }
+          - pattern-not-inside: |
+              if ($X.side === "buy") { ... }
+          - pattern-not-inside: |
+              switch ($X.side) { ... }
+          - pattern-not-inside: |
+              calculatePnl(...)
+    metadata:
+      category: correctness
+      pattern-source: "git show ef206c1 -- src/core/position-lifecycle.ts"
