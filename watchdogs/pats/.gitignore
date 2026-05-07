@@ -1,6 +1,9 @@
 # Runtime artifacts
 audit.log
 baseline.json
+state.json
+launchd.out.log
+launchd.err.log
 .cache/
 
 # Python
