@@ -73,6 +73,16 @@ _STATIC_TEMPLATES: dict[str, tuple[str, str, str]] = {
         "Open {path} at line {line} and filter signal-bot trades out of the rows before "
         "passing them to copyExecutor.hydrateOpenTrades. The c0e44b9 commit shows the pattern.",
     ),
+    "pats-missing-await-closeposition": (
+        "critical",
+        "The bot's code may have an async close-position call that isn't being awaited. "
+        "Found {count} place(s). When this happens, the variable holds a Promise that's "
+        "always truthy, so the next 'if' check always passes and silently masks the trade "
+        "close. On 2026-05-07 this exact pattern caused the database to record a real "
+        "$943 loss as zero. First example: {path} line {line}.",
+        "Open {path} at line {line} and add 'await' before the closePosition call. "
+        "The enclosing function may need to become async too. Commit 58d8257 shows the fix.",
+    ),
 }
 
 
