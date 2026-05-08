@@ -479,6 +479,26 @@
 
 ---
 
+## [Open] — 2026-05-08 — graphify clean regen with `repos/` excluded
+
+**What:** The vault's `Projects/claude-hq/Graph/` was last regenerated 2026-04-21. As of today, `graphify --update` detects 2,158 changed files — but **2,079 of those are inside `~/claude-hq/repos/`** (cloned reference repos that have accumulated since April, not our source). A naive full re-extraction would burn ~60 subagents and 30+ minutes processing material that isn't ours and shouldn't be in our knowledge graph.
+
+**Why:** The graphify skill doesn't natively respect `.gitignore`, even though `repos/` is gitignored. So re-extraction picks up the cloned trees alongside our actual source. We need either (a) a graphify config that excludes `repos/` or (b) a temporary mv-out / mv-back wrapper.
+
+**Estimate:** 1-2 hours. Most of the work is finding / writing the exclude mechanism and validating the resulting graph still has good cross-area connections (commander ↔ watchdog ↔ scripts ↔ patches).
+
+**How to start:**
+1. Check graphify's actual file-walk code to see if `--exclude` or `.graphifyignore` exists; if not, propose upstream patch.
+2. Alternative: write a wrapper script `~/claude-hq/scripts/graphify-update.sh` that temporarily renames `repos/` → `repos-snapshot/`, runs `/graphify --update --obsidian --obsidian-dir <vault path>`, renames back.
+3. Run a clean regen producing `Projects/claude-hq/Graph/` in vault.
+4. Commit vault + push.
+
+**Acceptance:** A `graphify --update` invocation that produces a fresh graph covering only HQ source (commander, watchdogs, scripts, patches, docs, agents, tools) without re-extracting `repos/`. Total file count after exclude should be <120, not 2,158.
+
+**Connection:** Hub.md and Decision Log narrative already cover the 2026-05-08 work for human readers — graphify is a nice-to-have visualisation, not blocking. Scheduled regen rather than session-end snapshot per Lesson 20 (don't ship un-instrumented work).
+
+---
+
 ## [Open] — 2026-05-08 — Paperclip watchdog: deferred runtime rules (Phase 2)
 
 **What:** Three rules deferred from the Tier 1 Paperclip watchdog build because they need API surface verification + soak data for calibration:
