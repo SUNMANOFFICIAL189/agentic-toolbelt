@@ -47,5 +47,17 @@
     "sent": false,
     "sent_at": null,
     "error": null
+  },
+  {
+    "id": "mempalace-corruption-backup-delete-2026-05-15",
+    "fire_at": "2026-05-15T08:00:00",
+    "channel": "telegram",
+    "severity": "info",
+    "subject": "MemPalace corruption backup ready to delete (~7 days old)",
+    "body": "On 2026-05-08 the MemPalace store got corrupted and we did a clean rebuild. Before deleting the broken store, we backed it up to ~/.mempalace/palace.backup-20260508-110856 (about 100 MB) in case anything we needed turned up later.\n\nIt's now been about a week. The rebuilt palace has been running cleanly through normal sessions, no signs we need anything from the old data, and the precheck + lockfile safeguards are in place to stop the same corruption recurring.\n\nIf nothing has surfaced as a need-to-recover by now, the backup is just disk space.",
+    "what_to_do": "Open Terminal and run:\n\n   du -sh ~/.mempalace/palace.backup-20260508-110856\n   rm -rf ~/.mempalace/palace.backup-20260508-110856\n\nIf you want to keep it longer, just ignore this reminder and tell future-Claude to defer the deletion.",
+    "sent": false,
+    "sent_at": null,
+    "error": null
   }
 ]
