@@ -55,21 +55,125 @@ ctx_grep() {
     fi
 }
 
-# 1. Vault Decision Log -------------------------------------------------------
-print_header "decision log (highest trust)"
+# Helper: grep a file with the regex but cap context lines to keep output tight
+ctx_grep_short() {
+    local file="$1"
+    local before="${2:-0}"
+    local after="${3:-1}"
+    if [ -f "$file" ]; then
+        grep -i -E -B "$before" -A "$after" -- "$QUERY_REGEX" "$file" 2>/dev/null | head -15 \
+            || echo "  no match"
+    else
+        echo "  (file not found)"
+    fi
+}
+
+# 1. PATTERNS.md — explicit reusable templates (highest reuse signal) ---------
+print_header "patterns (reusable templates — start here for RAG)"
+ctx_grep "$HOME/claude-hq/docs/PATTERNS.md" 1 3
+
+# 2. ANTI-PATTERNS.md — what NOT to suggest -----------------------------------
+print_header "anti-patterns (do NOT suggest these)"
+ctx_grep "$HOME/claude-hq/docs/ANTI-PATTERNS.md" 1 3
+
+# 3. Vault Decision Log -------------------------------------------------------
+print_header "decision log (provenance-tagged decisions)"
 DECISION_LOG="$HOME/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/claude-hq/Decision Log.md"
 ctx_grep "$DECISION_LOG" 1 3
 
-# 2. BACKLOG.md ---------------------------------------------------------------
+# 4. BACKLOG.md ---------------------------------------------------------------
 print_header "backlog (parked work)"
 ctx_grep "$HOME/claude-hq/docs/BACKLOG.md" 0 2
 
-# 3. LESSONS.md ---------------------------------------------------------------
+# 5. LESSONS.md ---------------------------------------------------------------
 print_header "lessons (preventive rules)"
 ctx_grep "$HOME/claude-hq/commander/LESSONS.md" 0 3
 
-# 4. MemPalace ----------------------------------------------------------------
-print_header "mempalace (semantic search)"
+# 6. Commander doctrines (COMMUNICATION, MODEL_ROUTING, COST_CONTROL, etc.) ---
+print_header "commander doctrines"
+for doctrine in COMMUNICATION MODEL_ROUTING COST_CONTROL TRUST_GATE INCIDENT_LEDGER BORIS_PRINCIPLES; do
+    f="$HOME/claude-hq/commander/${doctrine}.md"
+    if [ -f "$f" ] && grep -i -q -E -- "$QUERY_REGEX" "$f" 2>/dev/null; then
+        echo "  [$doctrine]"
+        grep -i -E -B 0 -A 1 -- "$QUERY_REGEX" "$f" 2>/dev/null | head -6 | sed 's/^/    /'
+    fi
+done
+
+# 7. Scripts INDEX — "we have a script for that" -----------------------------
+print_header "scripts index"
+ctx_grep_short "$HOME/claude-hq/scripts/INDEX.md" 0 0
+
+# 8. Tool / agent registries --------------------------------------------------
+print_header "tool registry (registry.json)"
+if [ -f "$HOME/claude-hq/registry.json" ]; then
+    python3 - "$QUERY_REGEX" <<'PY' 2>&1 | head -15
+import json, re, sys
+from pathlib import Path
+rx = re.compile(sys.argv[1], re.IGNORECASE)
+data = json.loads(Path.home().joinpath('claude-hq/registry.json').read_text())
+hits = []
+for tool in data.get('tools', []):
+    blob = ' '.join(filter(None, [
+        tool.get('id',''), tool.get('name',''), tool.get('description',''),
+        ' '.join(tool.get('activation_triggers', []) or []),
+    ]))
+    if rx.search(blob):
+        hits.append(f"  {tool.get('id'):<35} — {tool.get('description','')[:80]}")
+if hits:
+    for h in hits[:5]: print(h)
+else:
+    print("  no match")
+PY
+else
+    echo "  registry.json not found"
+fi
+
+print_header "agent bank (agents/registry.json)"
+if [ -f "$HOME/claude-hq/agents/registry.json" ]; then
+    python3 - "$QUERY_REGEX" <<'PY' 2>&1 | head -10
+import json, re, sys
+from pathlib import Path
+rx = re.compile(sys.argv[1], re.IGNORECASE)
+data = json.loads(Path.home().joinpath('claude-hq/agents/registry.json').read_text())
+agents = data.get('agents', []) if isinstance(data, dict) else []
+hits = []
+for ag in agents:
+    blob = ' '.join(filter(None, [
+        ag.get('id',''), ag.get('name',''), ag.get('description',''),
+        ' '.join(ag.get('activation_triggers', []) or []),
+    ]))
+    if rx.search(blob):
+        hits.append(f"  {ag.get('id'):<30} — {ag.get('description','')[:80]}")
+if hits:
+    for h in hits[:5]: print(h)
+else:
+    print("  no match")
+PY
+else
+    echo "  agent registry not found"
+fi
+
+# 9. Mission Boards — how past projects were decomposed -----------------------
+print_header "mission boards (project decompositions)"
+MISSION_HITS=0
+for mb in \
+    "$HOME/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/PATS-Copy/03 Mission Board.md" \
+    "$HOME/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/ai-agent-fleet-ventures/03 Mission Board.md" \
+    "$HOME/projects/ai-agent-fleet-ventures/MISSION_BOARD.md" \
+    "$HOME/projects/kl-talent-search/MISSION_BOARD.md" \
+    "$HOME/projects/moodboard-generator/MISSION_BOARD.md" \
+; do
+    if [ -f "$mb" ] && grep -i -q -E -- "$QUERY_REGEX" "$mb" 2>/dev/null; then
+        proj=$(basename "$(dirname "$mb")")
+        echo "  [$proj]"
+        grep -i -E -B 0 -A 2 -- "$QUERY_REGEX" "$mb" 2>/dev/null | head -8 | sed 's/^/    /'
+        MISSION_HITS=$((MISSION_HITS+1))
+    fi
+done
+[ "$MISSION_HITS" = "0" ] && echo "  no match"
+
+# 10. MemPalace ---------------------------------------------------------------
+print_header "mempalace (semantic search across mined drawers)"
 if command -v mempalace >/dev/null 2>&1; then
     # Run with a soft timeout via a Python wrapper since macOS lacks coreutils timeout
     python3 - "$QUERY" <<'PY' 2>&1 | head -30 || echo "  (mempalace error)"
@@ -125,4 +229,4 @@ echo "  '2026-05-08 — graphify clean regen with repos/ excluded'."
 
 # Footer ----------------------------------------------------------------------
 echo
-echo "(probe complete · trust hierarchy: decision log > backlog > lessons > mempalace > hindsight)"
+echo "(probe complete · trust hierarchy: patterns > anti-patterns > decision log > backlog > lessons > commander doctrines > registries > mission boards > mempalace > hindsight)"

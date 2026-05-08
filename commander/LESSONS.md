@@ -386,53 +386,73 @@
      governs how its *effectiveness* gets measured. A propose-only
      mechanism with no measurement is half a system.
 
-### 21. Probe memory before non-trivial work — second-brain only earns its keep when it's queried
-- **Rule:** Before starting a non-trivial task, run
+### 21. Probe memory at every task start — RAG retrieval of patterns, not continuation
+- **Rule:** At the start of every task in HQ mode (gate disabled — see
+  §"HQ vs non-HQ" below), run
   `~/claude-hq/scripts/memory-probe.sh "<task keywords>"` to sweep all
-  memory banks (Decision Log, BACKLOG, LESSONS, MemPalace, Hindsight)
-  for prior work, decisions, parked items, and rules the task should
-  respect. Surface relevant hits to the user *before* starting fresh
-  analysis. If a hit is highly relevant, propose continuing from there
-  rather than re-deriving.
-- **Why:** 2026-05-08 — Sunil pointed out that a second brain that
-  only gets queried when I happen to remember to check it isn't
-  earning its keep. The auto-loaded layers (MEMORY.md index, claude-mem
-  live context, LESSONS) cover the *small distilled* tier. The big
-  banks (MemPalace's 49,130 drawers, full Decision Log, full BACKLOG)
-  are not auto-loaded and therefore go unused unless explicitly
-  probed. Token math is heavily positive: a probe costs ~5,000 tokens
-  end-to-end; re-deriving an architectural decision because I missed
-  prior work costs 20,000-80,000 tokens. Even a 1-in-5 useful-hit rate
-  pays for itself.
+  memory banks for **transferable patterns, templates, and principles**
+  that could apply. The framing is RAG — past work is the corpus, the
+  task is the query, retrieved patterns are *ingredients* for the new
+  plan. NOT "did we do this exact thing before" but "what tools /
+  templates / principles do we already have that fit this shape?"
+  Surface relevant hits to the user with action-oriented framing
+  ("Reusable pattern found — recommend X") *before* starting fresh
+  analysis.
+- **Why:** 2026-05-08 — Sunil pointed out that the second-brain stack
+  (claude-mem, MemPalace, Obsidian, Hindsight) was built precisely so
+  accumulated knowledge could be retrieved efficiently — but only the
+  small distilled tier (MEMORY.md index, claude-mem live context,
+  LESSONS) was auto-loading. The big banks (MemPalace's 49,130 drawers,
+  full Decision Log, full BACKLOG, all of `commander/`, scripts index,
+  registries, mission boards) sat unqueried unless I happened to think
+  to check, which means most accumulated knowledge was effectively
+  *dead capital*. Worse: the framing was wrong — I was probing for
+  "continuation" (did we do this exact thing) when the higher-leverage
+  use is RAG retrieval of *transferable patterns* (what templates
+  apply here). Token math: a probe costs ~5,000 tokens end-to-end; re-
+  deriving an architectural decision or rebuilding a pattern from
+  scratch when a working template exists costs 20,000–80,000 tokens
+  plus quality risk from missed prior lessons. Even a 1-in-5 useful-
+  hit rate pays for itself.
 - **How to apply:**
-  1. **Trigger conditions (any one is enough):** the prompt could
-     plausibly have been worked on before · references "previous"/"we
-     discussed"/"what about" · involves a system we've touched before
-     (Paperclip, PATS, claude-hq, watchdogs, etc.) · is non-trivial
-     enough to risk re-deriving prior work · is the first message of a
-     session and the user is asking me to do something substantive.
-  2. **Skip conditions:** trivial questions ("what time is it?") ·
-     factual lookups ("what does X mean?") · continuation prompts
-     ("yes, proceed", "approve") · prompts where full context is
-     already in conversation · pure-mechanical tasks (rename a var,
-     format a file).
-  3. **Execution:** run the probe with the most distinctive keywords
-     from the user's task (3-5 words; avoid generic words like "build"
-     or "fix"). Skim the output by trust hierarchy: Decision Log →
-     BACKLOG → LESSONS → MemPalace → Hindsight. If a hit is highly
-     relevant, paraphrase it back to the user with provenance ("we
-     decided X on YYYY-MM-DD because Y") before starting work.
-  4. **Trust hierarchy when hits conflict:** Decision Log entries
-     (especially `[Sunil · strategic]` tags) > BACKLOG > LESSONS >
-     MemPalace semantic hits > Hindsight > Graphify (currently
-     deprioritised — graph is stale until clean regen per BACKLOG).
+  1. **HQ vs non-HQ (the gate):** Inside HQ mode (Commander activated
+     for the session), probe fires on *every* first task message after
+     activation — no triviality gate. Cost (~5k tokens) is small
+     compared to the value of never missing a transferable pattern.
+     Outside HQ mode (e.g., a one-shot fresh session in a different
+     cwd), the gate applies: skip on trivial questions, factual
+     lookups, continuation prompts, or when full context is already in
+     conversation.
+  2. **Execution:** extract 3-5 distinctive keywords from the task
+     (avoid generic words like "build", "fix"). Run
+     `~/claude-hq/scripts/memory-probe.sh "<keywords>"`. Skim the output
+     by trust hierarchy (see §3 below). Surface hits to the user with
+     **action-oriented framing** — "Reusable pattern found: X (2
+     instances). Recommend Y" — not historical framing ("we decided
+     X on date Y").
+  3. **Trust hierarchy on conflicts (highest to lowest):**
+     `PATTERNS.md` (curated reusable templates) > `ANTI-PATTERNS.md`
+     (don't suggest these) > Decision Log entries (especially
+     `[Sunil · strategic]`) > BACKLOG > LESSONS > Commander doctrines
+     > Tool/Agent registries > Mission Boards > MemPalace semantic
+     hits > Hindsight > Graphify (currently deprioritised — stale
+     until clean regen per BACKLOG).
+  4. **Action-oriented surfacing:** when a pattern hit is found, the
+     output to the user names (a) the pattern, (b) prior instances,
+     (c) the proposed reuse for the current task. Don't dump raw probe
+     output — synthesize and recommend.
   5. **Don't probe inside loops** — one probe per *task*, not per
-     prompt within a task. A long debugging session shouldn't probe
-     5x; it should probe once at the start.
-  6. **Failure modes:** if the probe surfaces nothing relevant, that
-     itself is signal — proceed and assume this is genuinely new work.
-     Don't probe again unless the task pivots into a new area.
-  7. **Adoption signal (per Lesson 20):** the HQ Watchdog should
-     eventually track `memory_probe_invocations_per_session` and
-     `tasks_starting_without_probe` to confirm this lesson is being
-     applied. Defer until the watchdog metric is wired (BACKLOG item).
+     prompt within a task. Re-probe only when the conversation visibly
+     pivots to a different area.
+  6. **Anti-pattern hits are veto signals.** If a probe surfaces a
+     hit from `ANTI-PATTERNS.md`, that approach is OFF THE TABLE.
+     Don't propose it; if asked, explain why it was dropped.
+  7. **Failure modes:** if the probe surfaces nothing relevant, that
+     itself is signal — proceed and assume this is genuinely new
+     ground. After the work succeeds, consider whether the new pattern
+     belongs in `PATTERNS.md` (criterion: would I reach for the same
+     shape a second time? If yes, capture it).
+  8. **Adoption signal (per Lesson 20):** future HQ Watchdog metrics
+     `memory_probe_invocations_per_session` and `tasks_starting_without_probe`
+     measure whether the rule is being applied. Tracked as BACKLOG
+     follow-up.
