@@ -1,0 +1,944 @@
+diff --git a/MULTI_MODEL_ROUTING.md b/MULTI_MODEL_ROUTING.md
+new file mode 100644
+index 0000000..7c2775e
+--- /dev/null
++++ b/MULTI_MODEL_ROUTING.md
+@@ -0,0 +1,127 @@
++# Multi-Model Routing (Paperclip ⇄ HQ Commander Doctrine)
++
++Branch: `feat/multi-model-routing`
++Status: Built 2026-05-08. Tests pass. Not merged. Soak alongside Paperclip watchdog.
++
++---
++
++## What this is
++
++A typed translation of HQ Commander's `~/claude-hq/commander/MODEL_ROUTING.md`
++doctrine into Paperclip's heartbeat dispatch path. Every Paperclip agent
++heartbeat now has its `config.model` *checked* — and possibly *adjusted* — by
++the doctrine before the adapter is invoked.
++
++The change is one insertion in `server/src/services/heartbeat.ts` plus a
++new `server/src/services/modelRouting/` module.
++
++## Why it exists
++
++The 2026-04-28 quota incident: three Paperclip agents (Validator, Builder,
++Planner) were configured on Opus 4.7 by default. Their heartbeats burned
++~66M tokens in 30 minutes overnight, depleting 91 percent of the daily
++Anthropic Max-plan quota. After the incident, agents were *manually*
++patched to Sonnet 4.5.
++
++This branch automates that decision: Paperclip now routes each agent to a
++tier-appropriate model based on the agent's role/name. Validator → Haiku,
++Builder → Sonnet, Researcher → Opus, anything containing "reviewer" or
++"architect" → Opus (hard floor, refuses downgrade).
++
++## Where it lives
++
++```
++server/src/services/modelRouting/
++├── doctrine.ts        # data + types: Tier, hard-floor list, keyword → tier table
++├── router.ts          # routeModel() pure function, the decision algorithm
++└── router.test.ts     # 18 vitest tests, all passing
++```
++
++Insertion site: `server/src/services/heartbeat.ts` after
++`applyRunScopedMentionedSkillKeys` builds `effectiveResolvedConfig`.
++
++## How the decision is made
++
++```
++1. HQ_ROUTER_OFF=1                  → passthrough (model unchanged)
++2. Pick a candidate tier:
++     a. HQ_MODEL_OVERRIDE=<tier>    → that tier
++     b. Doctrine keyword match      → tier from KEYWORD_TIER_TABLE in doctrine.ts
++     c. Default                     → sonnet
++3. Hard floor (HARD_FLOOR_PATTERNS) → forces opus, beats step 2
++4. HQ_MODEL_FLOOR=<tier>            → never go below this (raises only)
++```
++
++The router never throws. If anything is malformed, it returns sonnet.
++
++## Disabling — three options
++
++| Want | Set this env var |
++|---|---|
++| Disable routing entirely (back to upstream Paperclip behaviour) | `HQ_ROUTER_OFF=1` |
++| Force one tier for the whole session | `HQ_MODEL_OVERRIDE=opus` (or sonnet/haiku) |
++| Never go below a tier | `HQ_MODEL_FLOOR=sonnet` |
++
++These are read from `process.env` at every dispatch — no restart needed.
++
++## What this branch does NOT touch
++
++- Adapter internals — adapters that ignore `config.model` (plain webhook adapters) are unaffected.
++- Per-agent `config.model` defaults — those remain the operator's control. The router *overlays* on top.
++- Database schema — no migrations in this branch. Cost-ledger column extensions (`override_reason`, `matched_keyword`) are a follow-up.
++- Cross-provider routing (Phase 2 in HQ Commander's doctrine) — Paperclip stays Anthropic-only here.
++- Quality-gate sampling (Phase 3) — deferred.
++- Quota-aware degradation (Phase 4) — deferred.
++
++## How to revert
++
++```bash
++git switch master
++git branch -D feat/multi-model-routing   # only if you're sure
++```
++
++The current `master` branch is untouched and tracks `paperclipai/paperclip`
++upstream — which is read-only to us. Reverting cannot lose data.
++
++## Tests
++
++```bash
++cd server
++pnpm exec vitest run src/services/modelRouting/router.test.ts
++```
++
++18 tests cover: defaults, doctrine matches, hard floor, env overrides,
++override + floor interaction, robustness against null inputs.
++
++## Telemetry
++
++Every routing decision is logged via the existing pino logger:
++
++- **Model changed** — `logger.info` with `modelRouting.applied`, includes the previous model, routed model, tier, override reason, and matched keyword.
++- **Model unchanged** — `logger.debug` with `modelRouting.unchanged`, same fields. Quiet by default.
++
++A future patch can wire these into Paperclip's `cost_events` table by
++extending the schema; this branch deliberately keeps the DB schema clean.
++
++## Observability
++
++If you want to see routing in action without running the full Paperclip
++server, the function is pure and pure-testable:
++
++```ts
++import { routeModel } from "./modelRouting/router.js";
++
++const decision = routeModel({
++  agentKind: "Validator",
++  currentModel: "claude-opus-4-7",
++  env: process.env,
++});
++// → { model: "claude-haiku-4-5-...", tier: "haiku", overrideReason: "doctrine_match", matchedKeyword: "validator", passthrough: false }
++```
++
++## Reference
++
++- Authoritative doctrine: `~/claude-hq/commander/MODEL_ROUTING.md`
++- Quota incident memory: `~/.claude/projects/-Users-sunil-rajput/memory/project_quota_incident_2026_04_28.md`
++- Sister system (PATS dedicated watchdog): `~/claude-hq/watchdogs/pats/`
++- Paperclip dedicated watchdog (built same day): `~/claude-hq/watchdogs/paperclip/`
+diff --git a/server/src/services/heartbeat.ts b/server/src/services/heartbeat.ts
+index c8e3337..27f7b43 100644
+--- a/server/src/services/heartbeat.ts
++++ b/server/src/services/heartbeat.ts
+@@ -43,6 +43,7 @@ import type { AdapterExecutionResult, AdapterInvocationMeta, AdapterSessionCodec
+ import { createLocalAgentJwt } from "../agent-auth-jwt.js";
+ import { parseObject, asBoolean, asNumber, appendWithByteCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
+ import { costService } from "./costs.js";
++import { routeModel } from "./modelRouting/router.js";
+ import { trackAgentFirstHeartbeat } from "@paperclipai/shared/telemetry";
+ import { getTelemetryClient } from "../telemetry.js";
+ import { companySkillService } from "./company-skills.js";
+@@ -4903,6 +4904,49 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {})
+       resolvedConfig,
+       runScopedMentionedSkillKeys,
+     );
++
++    // Multi-model routing: HQ Commander's MODEL_ROUTING.md doctrine picks a
++    // tier-appropriate model from the agent's role/name. Bypass entirely with
++    // env HQ_ROUTER_OFF=1. See server/src/services/modelRouting/.
++    const currentModelForRouting = typeof effectiveResolvedConfig.model === "string"
++      ? effectiveResolvedConfig.model
++      : null;
++    const routingDecision = routeModel({
++      agentKind: agent.name,
++      currentModel: currentModelForRouting,
++      env: process.env,
++    });
++    if (
++      !routingDecision.passthrough &&
++      routingDecision.model &&
++      routingDecision.model !== currentModelForRouting
++    ) {
++      logger.info(
++        {
++          agentId: agent.id,
++          agentName: agent.name,
++          previousModel: currentModelForRouting,
++          routedModel: routingDecision.model,
++          tier: routingDecision.tier,
++          overrideReason: routingDecision.overrideReason,
++          matchedKeyword: routingDecision.matchedKeyword,
++        },
++        "modelRouting.applied",
++      );
++      effectiveResolvedConfig.model = routingDecision.model;
++    } else {
++      logger.debug(
++        {
++          agentId: agent.id,
++          agentName: agent.name,
++          currentModel: currentModelForRouting,
++          tier: routingDecision.tier,
++          overrideReason: routingDecision.overrideReason,
++        },
++        "modelRouting.unchanged",
++      );
++    }
++
+     const runtimeSkillEntries = await companySkills.listRuntimeSkillEntries(agent.companyId);
+     let runtimeConfig = {
+       ...effectiveResolvedConfig,
+diff --git a/server/src/services/modelRouting/doctrine.ts b/server/src/services/modelRouting/doctrine.ts
+new file mode 100644
+index 0000000..5607291
+--- /dev/null
++++ b/server/src/services/modelRouting/doctrine.ts
+@@ -0,0 +1,160 @@
++/**
++ * Model routing doctrine — typed translation of HQ Commander's
++ * `~/claude-hq/commander/MODEL_ROUTING.md` for use inside Paperclip.
++ *
++ * This file is data + types only. Decision logic lives in `router.ts`.
++ *
++ * Design notes:
++ * - V1 routes by *agent kind* (not free-text task description). Paperclip
++ *   agents have stable roles; per-issue keyword routing is deferred until
++ *   we have soak data showing agent-kind routing is insufficient.
++ * - Hard floor list refuses downgrade for adversarial / high-stakes work.
++ * - Tiers are abstract (haiku / sonnet / opus); concrete model strings are
++ *   resolved via {@link TIER_TO_MODEL}. Update one place when Anthropic ships
++ *   a new generation.
++ * - The doctrine *never* changes which provider is called by adapter
++ *   internals — it only proposes a `model:` field on the resolved config.
++ *   Adapters that ignore `config.model` (e.g. plain webhook adapters) are
++ *   unaffected.
++ */
++
++export type Tier = "haiku" | "sonnet" | "opus";
++
++/**
++ * Concrete Anthropic model identifiers per tier.
++ * Synchronised with HQ Commander's MODEL_ROUTING.md §11 context-window table.
++ *
++ * Update points when models roll forward:
++ * - Bump these strings.
++ * - Cross-check with HQ Commander/MODEL_ROUTING.md §11 stays the source of truth.
++ */
++export const TIER_TO_MODEL: Record<Tier, string> = {
++  haiku: "claude-haiku-4-5-20251001",
++  sonnet: "claude-sonnet-4-6",
++  opus: "claude-opus-4-7",
++};
++
++export const DEFAULT_TIER: Tier = "sonnet";
++
++/**
++ * Numeric ordering: higher tier = higher number. Used for floor + ranking.
++ */
++export const TIER_RANK: Record<Tier, number> = {
++  haiku: 0,
++  sonnet: 1,
++  opus: 2,
++};
++
++/**
++ * Hard floor — agent kinds that refuse all downgrades. Even quota-aware
++ * degradation skips them. Match is case-insensitive substring against
++ * agent.name / agent.role / agent.kind.
++ *
++ * Source: MODEL_ROUTING.md §4.
++ */
++export const HARD_FLOOR_PATTERNS: readonly string[] = [
++  "red-team",
++  "redteam",
++  "adversarial",
++  "reviewer",
++  "review-",
++  "security-review",
++  "code-review",
++  "legal-review",
++  "legal",
++  "compliance",
++  "investor-comms",
++  "investor-materials",
++  "investor-outreach",
++  "investor",
++  "architect",
++  "code-architect",
++];
++
++/**
++ * One row of the doctrine table — match by keyword in agent kind/role,
++ * pick the tier. Higher priority wins ties.
++ *
++ * Source: MODEL_ROUTING.md §5 — adapted from "task shape" to "agent kind"
++ * because Paperclip agents are stable role-bearing personas.
++ */
++export interface DoctrineRow {
++  keywords: readonly string[];
++  tier: Tier;
++  priority: number;
++  description: string;
++}
++
++export const KEYWORD_TIER_TABLE: readonly DoctrineRow[] = [
++  // Opus tier — high-stakes / architectural / synthesis. Most also catch via hard floor.
++  {
++    keywords: ["architect", "design-system", "blueprint", "planner", "ceo", "strategy"],
++    tier: "opus",
++    priority: 30,
++    description: "architecture / strategic planning / CEO-level synthesis",
++  },
++  {
++    keywords: ["red-team", "adversarial", "threat-model", "contradict", "challenge"],
++    tier: "opus",
++    priority: 30,
++    description: "adversarial reasoning",
++  },
++  {
++    keywords: ["investor", "pitch", "deck", "memo", "fundraise"],
++    tier: "opus",
++    priority: 30,
++    description: "investor-facing communication",
++  },
++  {
++    keywords: ["legal", "compliance", "regulatory", "license"],
++    tier: "opus",
++    priority: 30,
++    description: "legal / compliance work",
++  },
++  {
++    keywords: ["researcher", "analyst", "synthesis"],
++    tier: "opus",
++    priority: 25,
++    description: "deep research / multi-source synthesis (event-driven Opus per quota incident lesson)",
++  },
++
++  // Sonnet tier — default for most coding/builder/standard work.
++  {
++    keywords: ["builder", "engineer", "developer", "implement", "tdd", "test"],
++    tier: "sonnet",
++    priority: 20,
++    description: "standard implementation work",
++  },
++  {
++    keywords: ["refactor", "restructure", "decompose"],
++    tier: "sonnet",
++    priority: 20,
++    description: "refactoring proposals",
++  },
++  {
++    keywords: ["pm", "product-manager", "coordinator"],
++    tier: "sonnet",
++    priority: 18,
++    description: "product / coordination",
++  },
++
++  // Haiku tier — bounded mechanical work.
++  {
++    keywords: ["validator", "linter", "formatter", "checker"],
++    tier: "haiku",
++    priority: 10,
++    description: "mechanical validation / format / lint",
++  },
++  {
++    keywords: ["classifier", "tagger", "labeler", "summariser", "summarizer"],
++    tier: "haiku",
++    priority: 10,
++    description: "classification / summarisation",
++  },
++  {
++    keywords: ["watcher", "monitor", "ping"],
++    tier: "haiku",
++    priority: 10,
++    description: "lightweight monitoring",
++  },
++];
+diff --git a/server/src/services/modelRouting/router.test.ts b/server/src/services/modelRouting/router.test.ts
+new file mode 100644
+index 0000000..29778a4
+--- /dev/null
++++ b/server/src/services/modelRouting/router.test.ts
+@@ -0,0 +1,343 @@
++import { describe, expect, it } from "vitest";
++import { routeModel } from "./router.js";
++import { TIER_TO_MODEL } from "./doctrine.js";
++
++const noEnv = {} as NodeJS.ProcessEnv;
++
++describe("routeModel — defaults and doctrine match", () => {
++  it("returns sonnet when no agent kind matches and no current model", () => {
++    const d = routeModel({
++      agentKind: "totally-unknown-kind",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.model).toBe(TIER_TO_MODEL.sonnet);
++    expect(d.overrideReason).toBe("default");
++    expect(d.matchedKeyword).toBeNull();
++    expect(d.passthrough).toBe(false);
++  });
++
++  it("routes builder agents to sonnet via doctrine", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.overrideReason).toBe("doctrine_match");
++    expect(d.matchedKeyword).toBe("builder");
++  });
++
++  it("routes validator agents to haiku via doctrine when no current tier set", () => {
++    const d = routeModel({
++      agentKind: "validator",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("haiku");
++    expect(d.overrideReason).toBe("doctrine_match");
++    expect(d.matchedKeyword).toBe("validator");
++  });
++
++  it("routes researcher agents to opus", () => {
++    const d = routeModel({
++      agentKind: "Researcher",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++  });
++});
++
++describe("routeModel — hard floor", () => {
++  it("forces opus for any agent kind matching the hard floor", () => {
++    const d = routeModel({
++      agentKind: "code-reviewer",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++
++  it("hard floor beats HQ_MODEL_OVERRIDE=haiku", () => {
++    const d = routeModel({
++      agentKind: "security-reviewer",
++      currentModel: null,
++      env: { HQ_MODEL_OVERRIDE: "haiku" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++
++  it("hard floor catches investor-facing kinds", () => {
++    const d = routeModel({
++      agentKind: "investor-outreach-agent",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++
++  it("hard floor catches legal", () => {
++    const d = routeModel({
++      agentKind: "legal-counsel-bot",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++
++  it("hard floor escalates even when current model is already Haiku", () => {
++    const d = routeModel({
++      agentKind: "code-reviewer",
++      currentModel: "claude-haiku-4-5-20251001",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++});
++
++describe("routeModel — env overrides", () => {
++  it("HQ_ROUTER_OFF=1 returns currentModel verbatim and marks passthrough", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "claude-foo-99",
++      env: { HQ_ROUTER_OFF: "1" } as NodeJS.ProcessEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.model).toBe("claude-foo-99");
++    expect(d.overrideReason).toBe("router_off");
++  });
++
++  it("HQ_MODEL_OVERRIDE=opus forces opus on a builder agent", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: null,
++      env: { HQ_MODEL_OVERRIDE: "opus" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("env_override");
++  });
++
++  it("HQ_MODEL_OVERRIDE=haiku is honoured even if current model is Sonnet (explicit user intent)", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "claude-sonnet-4-5-20250929",
++      env: { HQ_MODEL_OVERRIDE: "haiku" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("haiku");
++    expect(d.overrideReason).toBe("env_override");
++  });
++
++  it("invalid HQ_MODEL_OVERRIDE value is ignored — doctrine wins", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: null,
++      env: { HQ_MODEL_OVERRIDE: "garbage" } as NodeJS.ProcessEnv,
++    });
++    expect(d.overrideReason).toBe("doctrine_match");
++  });
++
++  it("HQ_MODEL_FLOOR=sonnet raises a haiku validator to sonnet", () => {
++    const d = routeModel({
++      agentKind: "validator",
++      currentModel: null,
++      env: { HQ_MODEL_FLOOR: "sonnet" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.overrideReason).toBe("floor_raised");
++  });
++
++  it("HQ_MODEL_FLOOR=haiku does NOT lower an opus researcher", () => {
++    const d = routeModel({
++      agentKind: "researcher",
++      currentModel: null,
++      env: { HQ_MODEL_FLOOR: "haiku" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("opus");
++  });
++
++  it("router_off short-circuits even when other env vars are set", () => {
++    const d = routeModel({
++      agentKind: "code-reviewer",
++      currentModel: "claude-some-x",
++      env: { HQ_ROUTER_OFF: "1", HQ_MODEL_OVERRIDE: "haiku" } as NodeJS.ProcessEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.model).toBe("claude-some-x");
++  });
++});
++
++describe("routeModel — non-Anthropic passthrough (safety rule, 2026-05-08)", () => {
++  it("gemini model on Planner stays on Gemini — recreates the 2026-04-28 safety guarantee", () => {
++    const d = routeModel({
++      agentKind: "Planner",
++      currentModel: "gemini-2.5-flash",
++      env: noEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.model).toBe("gemini-2.5-flash");
++    expect(d.overrideReason).toBe("non_anthropic_passthrough");
++  });
++
++  it("gpt model is left alone", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "gpt-4-turbo",
++      env: noEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.model).toBe("gpt-4-turbo");
++    expect(d.overrideReason).toBe("non_anthropic_passthrough");
++  });
++
++  it("kimi-k2 is left alone (not Claude-shaped, not Anthropic)", () => {
++    const d = routeModel({
++      agentKind: "researcher",
++      currentModel: "kimi-k2-instruct",
++      env: noEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.overrideReason).toBe("non_anthropic_passthrough");
++  });
++
++  it("Claude-shaped current model still goes through doctrine", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "claude-sonnet-4-5-20250929",
++      env: noEnv,
++    });
++    expect(d.passthrough).toBe(false);
++    expect(d.tier).toBe("sonnet");
++  });
++
++  it("non-Anthropic passthrough still honoured even if hard-floor agent kind", () => {
++    // Operator deliberately put a security reviewer on Gemini — that's their call.
++    // Cross-provider trumps doctrine, even hard floor.
++    const d = routeModel({
++      agentKind: "security-reviewer",
++      currentModel: "gemini-2.5-pro",
++      env: noEnv,
++    });
++    expect(d.passthrough).toBe(true);
++    expect(d.model).toBe("gemini-2.5-pro");
++    expect(d.overrideReason).toBe("non_anthropic_passthrough");
++  });
++
++  it("HQ_ROUTER_OFF wins over non-Anthropic passthrough (router_off is explicit)", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "gemini-2.5-flash",
++      env: { HQ_ROUTER_OFF: "1" } as NodeJS.ProcessEnv,
++    });
++    expect(d.overrideReason).toBe("router_off");
++  });
++});
++
++describe("routeModel — current tier as floor (safety rule, 2026-05-08)", () => {
++  it("Validator on Sonnet stays on Sonnet — doctrine's Haiku is not an allowed downgrade", () => {
++    const d = routeModel({
++      agentKind: "validator",
++      currentModel: "claude-sonnet-4-5-20250929",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.overrideReason).toBe("current_tier_floor");
++  });
++
++  it("Validator on Opus stays on Opus", () => {
++    const d = routeModel({
++      agentKind: "validator",
++      currentModel: "claude-opus-4-7",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("current_tier_floor");
++  });
++
++  it("Validator on Haiku stays on Haiku — doctrine matches, no upgrade needed", () => {
++    const d = routeModel({
++      agentKind: "validator",
++      currentModel: "claude-haiku-4-5-20251001",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("haiku");
++    expect(d.overrideReason).toBe("doctrine_match");
++  });
++
++  it("Builder on Haiku is upgraded to Sonnet — doctrine escalates as expected", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "claude-haiku-4-5-20251001",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.overrideReason).toBe("doctrine_match");
++  });
++
++  it("Unknown agent kind on Opus stays on Opus — default would be Sonnet", () => {
++    const d = routeModel({
++      agentKind: "totally-unknown",
++      currentModel: "claude-opus-4-7",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("current_tier_floor");
++  });
++
++  it("HQ_MODEL_OVERRIDE=haiku DOES downgrade — explicit operator intent wins over current_tier_floor", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: "claude-sonnet-4-5-20250929",
++      env: { HQ_MODEL_OVERRIDE: "haiku" } as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("haiku");
++    expect(d.overrideReason).toBe("env_override");
++  });
++
++  it("hard floor still wins over current_tier_floor — never let an architect downgrade", () => {
++    // (Edge case — architect on Haiku is unusual but doctrine should still escalate.)
++    const d = routeModel({
++      agentKind: "architect",
++      currentModel: "claude-haiku-4-5-20251001",
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++    expect(d.overrideReason).toBe("hard_floor");
++  });
++});
++
++describe("routeModel — robustness", () => {
++  it("handles null agentKind without throwing", () => {
++    const d = routeModel({
++      agentKind: null,
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++    expect(d.overrideReason).toBe("default");
++  });
++
++  it("handles undefined env without throwing", () => {
++    const d = routeModel({
++      agentKind: "Builder",
++      currentModel: null,
++      env: {} as NodeJS.ProcessEnv,
++    });
++    expect(d.tier).toBe("sonnet");
++  });
++
++  it("higher-priority opus row beats sonnet match on a multi-keyword agent kind", () => {
++    const d = routeModel({
++      agentKind: "principal-architect-engineer",
++      currentModel: null,
++      env: noEnv,
++    });
++    expect(d.tier).toBe("opus");
++  });
++});
+diff --git a/server/src/services/modelRouting/router.ts b/server/src/services/modelRouting/router.ts
+new file mode 100644
+index 0000000..115e546
+--- /dev/null
++++ b/server/src/services/modelRouting/router.ts
+@@ -0,0 +1,228 @@
++/**
++ * Model routing function — typed implementation of HQ Commander's
++ * MODEL_ROUTING.md §3 decision algorithm, narrowed to Paperclip's
++ * agent-dispatch surface.
++ *
++ * Pure function. No side effects, no I/O. The caller (heartbeat.ts)
++ * logs the decision and applies it to the resolved config.
++ *
++ * Insertion site: server/src/services/heartbeat.ts after
++ * resolveExecutionRunAdapterConfig completes, before the adapter is invoked.
++ */
++
++import {
++  DEFAULT_TIER,
++  HARD_FLOOR_PATTERNS,
++  KEYWORD_TIER_TABLE,
++  TIER_RANK,
++  TIER_TO_MODEL,
++  type Tier,
++} from "./doctrine.js";
++
++export interface RouteModelInput {
++  /** Free-text describing the agent role/kind. e.g. "Validator", "CTO", "researcher". */
++  agentKind: string | null | undefined;
++  /** Optional task description (issue title + body). V1 uses agentKind only; held for v2. */
++  taskDescription?: string | null | undefined;
++  /** Currently configured model on the agent's adapterConfig.model — preserved if router is OFF. */
++  currentModel: string | null | undefined;
++  /** Process env or a subset thereof. Read for HQ_* overrides. */
++  env: NodeJS.ProcessEnv | Record<string, string | undefined>;
++}
++
++export type OverrideReason =
++  | "router_off"
++  | "non_anthropic_passthrough"
++  | "env_override"
++  | "doctrine_match"
++  | "hard_floor"
++  | "default"
++  | "floor_raised"
++  | "current_tier_floor";
++
++export interface RoutingDecision {
++  /** The concrete model string to put on config.model. */
++  model: string;
++  /** Tier the model resolves to. */
++  tier: Tier;
++  /** Why this decision was made — for the cost ledger / audit log. */
++  overrideReason: OverrideReason;
++  /** If a doctrine row matched, the matching keyword. null otherwise. */
++  matchedKeyword: string | null;
++  /** True if router was bypassed entirely (HQ_ROUTER_OFF=1). model == currentModel. */
++  passthrough: boolean;
++}
++
++/**
++ * Apply HQ doctrine to choose a model for a Paperclip agent dispatch.
++ *
++ * Hierarchy (first match wins; hard floor and HQ_MODEL_FLOOR can only escalate):
++ *   1. HQ_ROUTER_OFF=1                  → passthrough (model unchanged)
++ *   2. currentModel is non-Anthropic    → passthrough (preserve cross-provider choice)
++ *   3. Pick candidate tier:
++ *        a. HQ_MODEL_OVERRIDE=<tier>    → that tier (operator's explicit intent)
++ *        b. Doctrine keyword match      → tier from KEYWORD_TIER_TABLE
++ *        c. Default                     → sonnet
++ *   4. current_tier_floor — for non-override flows ONLY: raise to currentTier
++ *      if it's higher (never downgrade an operator's deliberate choice).
++ *   5. Hard floor (§4)                  → forces opus, beats steps 3 + 4.
++ *   6. HQ_MODEL_FLOOR=<tier>            → raises only; never lowers.
++ *
++ * Failure semantics: this function never throws. If anything is malformed,
++ * it returns a "default" decision (sonnet).
++ *
++ * The two safety rules added 2026-05-08 (steps 2 and 4) prevent the router
++ * from re-creating the 2026-04-28 quota-incident shape:
++ *   - Step 2 keeps cross-provider choices (Gemini, etc.) untouched.
++ *   - Step 4 ensures doctrine can only escalate operator config, never lower it.
++ */
++export function routeModel(input: RouteModelInput): RoutingDecision {
++  const env = input.env ?? {};
++  const currentModel = (input.currentModel ?? "").trim();
++
++  // 1. Router-off short-circuit (always honoured first)
++  if (env.HQ_ROUTER_OFF === "1") {
++    return {
++      model: currentModel,
++      tier: tierForModel(currentModel) ?? DEFAULT_TIER,
++      overrideReason: "router_off",
++      matchedKeyword: null,
++      passthrough: true,
++    };
++  }
++
++  // 2. Non-Anthropic short-circuit (added 2026-05-08).
++  //    If the operator deliberately moved an agent off Claude (e.g., to
++  //    gemini-2.5-flash or gpt-4), the router must not pull it back. Cross-
++  //    provider decisions are out of doctrine scope.
++  if (currentModel && !isAnthropicModel(currentModel)) {
++    return {
++      model: currentModel,
++      tier: DEFAULT_TIER, // tier is informational only on passthrough
++      overrideReason: "non_anthropic_passthrough",
++      matchedKeyword: null,
++      passthrough: true,
++    };
++  }
++
++  const agentKind = (input.agentKind ?? "").trim().toLowerCase();
++  const currentTier = tierForModel(currentModel);
++
++  // 3. Pick candidate tier
++  let tier: Tier;
++  let overrideReason: OverrideReason;
++  let matchedKeyword: string | null = null;
++
++  const envOverride = parseTier(env.HQ_MODEL_OVERRIDE);
++  if (envOverride) {
++    tier = envOverride;
++    overrideReason = "env_override";
++    // env_override is operator's explicit per-session intent — current_tier_floor
++    // does NOT apply here. If the operator wants HQ_MODEL_OVERRIDE=haiku they
++    // mean it; the safety net is that they typed it.
++  } else {
++    const matched = matchDoctrine(agentKind);
++    if (matched) {
++      tier = matched.tier;
++      overrideReason = "doctrine_match";
++      matchedKeyword = matched.keyword;
++    } else {
++      tier = DEFAULT_TIER;
++      overrideReason = "default";
++    }
++
++    // 4. current_tier_floor (added 2026-05-08).
++    //    If the operator currently has the agent on a HIGHER tier than doctrine
++    //    picked, keep the operator's choice. Doctrine can only escalate, not
++    //    downgrade. (Skipped when env_override is set — explicit user intent.)
++    if (currentTier && TIER_RANK[currentTier] > TIER_RANK[tier]) {
++      tier = currentTier;
++      overrideReason = "current_tier_floor";
++    }
++  }
++
++  // 5. Hard-floor guard — adversarial / high-stakes work always escalates to Opus.
++  //    Beats env_override and current_tier_floor.
++  if (matchesHardFloor(agentKind)) {
++    tier = "opus";
++    overrideReason = "hard_floor";
++  }
++
++  // 6. HQ_MODEL_FLOOR — session-wide safety raise. Only raises, never lowers.
++  const floor = parseTier(env.HQ_MODEL_FLOOR);
++  if (floor && TIER_RANK[floor] > TIER_RANK[tier]) {
++    tier = floor;
++    overrideReason = "floor_raised";
++  }
++
++  return {
++    model: TIER_TO_MODEL[tier],
++    tier,
++    overrideReason,
++    matchedKeyword,
++    passthrough: false,
++  };
++}
++
++// ---------------------------------------------------------------------------
++// Internals
++// ---------------------------------------------------------------------------
++
++function parseTier(value: string | undefined | null): Tier | null {
++  if (typeof value !== "string") return null;
++  const v = value.trim().toLowerCase();
++  if (v === "haiku" || v === "sonnet" || v === "opus") return v;
++  return null;
++}
++
++function tierForModel(model: string): Tier | null {
++  const m = model.toLowerCase();
++  if (m.includes("haiku")) return "haiku";
++  if (m.includes("sonnet")) return "sonnet";
++  if (m.includes("opus")) return "opus";
++  return null;
++}
++
++/**
++ * Anthropic-shaped model strings (case-insensitive).
++ * Examples that match: "claude-sonnet-4-6", "Claude-Haiku-4-5-20251001",
++ *   "claude-opus-4-7", "claude-foo-99" (unknown but Claude-shaped).
++ * Examples that do NOT match: "gemini-2.5-flash", "gpt-4", "kimi-k2".
++ *
++ * Heuristic: starts with "claude" or contains "anthropic". This intentionally
++ * accepts unknown Claude-shaped strings so a future model name like
++ * "claude-future-99" is treated as routable rather than passed through.
++ */
++function isAnthropicModel(model: string): boolean {
++  const m = model.toLowerCase().trim();
++  return m.startsWith("claude") || m.includes("anthropic");
++}
++
++interface DoctrineMatch {
++  tier: Tier;
++  keyword: string;
++  priority: number;
++}
++
++function matchDoctrine(agentKind: string): DoctrineMatch | null {
++  if (!agentKind) return null;
++  let best: DoctrineMatch | null = null;
++  for (const row of KEYWORD_TIER_TABLE) {
++    for (const kw of row.keywords) {
++      if (agentKind.includes(kw)) {
++        if (!best || row.priority > best.priority || TIER_RANK[row.tier] > TIER_RANK[best.tier]) {
++          best = { tier: row.tier, keyword: kw, priority: row.priority };
++        }
++      }
++    }
++  }
++  return best;
++}
++
++function matchesHardFloor(agentKind: string): boolean {
++  if (!agentKind) return false;
++  for (const pattern of HARD_FLOOR_PATTERNS) {
++    if (agentKind.includes(pattern)) return true;
++  }
++  return false;
++}
