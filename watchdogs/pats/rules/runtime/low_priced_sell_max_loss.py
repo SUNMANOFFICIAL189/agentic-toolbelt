@@ -9,7 +9,8 @@ max-loss exposure (24x the position dollar amount).
 
 Position sizer treats max-loss as if it equals our_size. True for BUY,
 false for SELL. This rule flags any open SELL where the asymmetric max-
-loss exceeds 1.5% of current portfolio balance.
+loss exceeds the configured fraction of current portfolio balance (defaults
+to 5%, matching the bot's MAX_LOSS_PCT_PER_TRADE env var as of 2026-05-08).
 
 Calibrated against 2026-05-07 finding: a $75 SELL at entry 0.041 closed
 for -$943 in a single event when the side-aware stop-loss surfaced the
@@ -32,7 +33,12 @@ from lib.finding import Finding, emit
 from lib.supabase import query
 
 RULE_ID = "pats-runtime-low-priced-sell-max-loss"
-MAX_LOSS_FRACTION = 0.015  # 1.5% of balance
+import os as _os
+# Read from env to stay aligned with the bot's MAX_LOSS_PCT_PER_TRADE.
+# Default 0.05 (5%) matches the SELL-aware sizing recalibration shipped at
+# PATS-Copy commit 935d44f. If the bot's env diverges from this default
+# the watchdog should be re-pointed via this same env var.
+MAX_LOSS_FRACTION = float(_os.environ.get("MAX_LOSS_PCT_PER_TRADE", "0.05") or "0.05")
 INITIAL_BALANCE_FALLBACK = 6300.0
 
 
@@ -78,7 +84,7 @@ def main() -> int:
         severity="critical",
         what_happened=(
             f"The bot has {count} open SELL position(s) that could lose more than "
-            f"1.5% of the portfolio if the bet goes against us. The biggest one: "
+            f"{MAX_LOSS_FRACTION * 100:.1f}% of the portfolio if the bet goes against us. The biggest one: "
             f"\"{sample['market_id'][:50]}\" entered at {sample['entry_price']:.4f}, "
             f"could lose ${sample['max_loss_dollars']:.0f} "
             f"({sample['max_loss_pct_of_balance']:.1f}% of portfolio)."
