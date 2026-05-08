@@ -17,7 +17,7 @@ The "auto-fix-with-approval" capability is Tier 4 — months of additional work 
 
 ---
 
-## What Tier 1 catches (5 starter rules)
+## What Tier 1 catches (5 starter rules + Branch 2 shadow health)
 
 Each rule is calibrated against a real bug from the 2026-05-07 PATS-Copy session.
 
@@ -28,6 +28,7 @@ Each rule is calibrated against a real bug from the 2026-05-07 PATS-Copy session
 | 3 | Single-source-of-truth trade tracking | Static (semgrep) | Dual-executor mismatch — `copyExecutor` and `signalExecutor` both holding signal-bot trades |
 | 4 | Supabase ↔ memory consistency | Runtime (Python) | Stale "open" rows from failed close persistence |
 | 5 | Cron entries reference existing files | Runtime (Python via SSH) | Broken cron — server cron pointing to deleted files like `health-check.sh` |
+| 6 | Branch 2 shadow health (4 sub-checks) | Runtime (Python via SSH) | Phase 6 shadow window: WS disconnect >5min, no blocks >10min, WS recall <95%, WS slower than REST by >5s. Silent when `BLOCK_LISTENER_ENABLED=false`. |
 
 ---
 
