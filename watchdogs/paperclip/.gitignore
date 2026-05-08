@@ -1,0 +1,9 @@
+# Run artefacts — never commit
+audit.log
+state.json
+launchd.out.log
+launchd.err.log
+__pycache__/
+*.pyc
+.ruff_cache/
+.venv/

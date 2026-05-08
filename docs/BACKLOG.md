@@ -479,6 +479,42 @@
 
 ---
 
+## [Open] — 2026-05-08 — Paperclip watchdog: deferred runtime rules (Phase 2)
+
+**What:** Three rules deferred from the Tier 1 Paperclip watchdog build because they need API surface verification + soak data for calibration:
+1. `stale_heartbeat.py` — agent that should have woken in last X minutes hasn't.
+2. `failed_run_rate.py` — high failure percentage across runs in a window (warn at >20%, critical at >50%).
+3. `stuck_queued_runs.py` — runs queued but not executing for >30 minutes.
+
+**Why:** Tier 1 shipped 4 rules calibrated against the 2026-04-28 quota incident (server health, HC.io relay, token burn rate, agent quota threshold). The 3 above need: (a) Paperclip's `/agents/:id/runtime-state` and `/issues/:id/runs` response shapes mapped end-to-end, (b) a soak window of real Paperclip activity to know what "normal" looks like for stale-thresholds and failure-rate baselines. Shipping uncalibrated would mean alert noise on day one.
+
+**Estimate:** 1 day. Most of the work is calibration during the 14-day soak (2026-05-08 → 2026-05-22), then writing the rules in the same shape as the existing four.
+
+**How to start:**
+1. After 2026-05-22 soak end: review `~/claude-hq/watchdogs/paperclip/audit.log` for what real Paperclip activity looks like.
+2. For stale_heartbeat: pick a stale-window threshold (likely 2× the agent's configured heartbeat interval).
+3. For failed_run_rate: confirm the failure-rate baseline from soak data, set warn at 2× normal, critical at 4×.
+4. For stuck_queued_runs: confirm Paperclip's existing stale-run cancellation timeout in `heartbeat.ts`, set the watchdog threshold below it so we alert *before* Paperclip auto-cancels.
+5. Write each rule following the pattern in `~/claude-hq/watchdogs/paperclip/rules/runtime/server_health.py`.
+
+**Acceptance:** Three new rules in `rules/runtime/`, each tested with `--once-stdout`, plain-English findings, audit-log entries. Soak window for the new rules: 7 days each (shorter than initial soak because the orchestrator pattern is already proven).
+
+---
+
+## [Done] — 2026-05-08 — Paperclip dedicated watchdog (Tier 1)
+
+**What:** Built `~/claude-hq/watchdogs/paperclip/` as the second tenant of the watchdogs framework (PATS was first). Four runtime rules: server_health, healthchecks_io_relay, token_burn_rate, agent_quota_threshold. Soak mode default for 14 days (ends 2026-05-22). launchd plist included but NOT auto-loaded — operator installs manually.
+
+**Why:** The 2026-04-28 quota incident proved Paperclip needs per-project monitoring beyond its built-in `/health` and stale-run cleanup. Mirrors the dedicated PATS watchdog pattern. Replaces the manual `~/claude-hq/scripts/paperclip-burn-tracker.py` script (which stays as a one-off CLI tool but isn't on a timer).
+
+**Resolution:** Files: `orchestrator.py`, 4 runtime rule scripts, `lib/{finding,alerts,paperclip_api}.py`, `com.claude-hq.paperclip-watchdog.plist`, README. Reminder set in `watchdog/reminders.json` for 2026-05-22 soak end. Telegram alerts prefixed `[Paperclip]` to distinguish from PATS.
+
+**Healthchecks.io setup:** ✅ Done 2026-05-08. Two checks created in user's existing HC.io account: `paperclip-server` and `paperclip-watchdog`. URLs in `~/claude-hq/watchdog/healthchecks-urls.env`. Initial ping confirmed (HTTP 200 from both endpoints). Note: `_ping()` now uses certifi's CA bundle because macOS system Python doesn't link the SSL bundle by default — fix applied in `rules/runtime/healthchecks_io_relay.py`.
+
+**Connection:** Tier 1 only — detect + alert, no auto-fix. Tier 2-4 deferred per the existing project-watchdog framework.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.

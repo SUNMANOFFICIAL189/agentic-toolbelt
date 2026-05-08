@@ -35,5 +35,17 @@
     "sent": false,
     "sent_at": null,
     "error": null
+  },
+  {
+    "id": "paperclip-watchdog-soak-end-2026-05-22",
+    "fire_at": "2026-05-22T08:00:00",
+    "channel": "telegram",
+    "severity": "info",
+    "subject": "Paperclip watchdog soak ending — ready to flip to active?",
+    "body": "The Paperclip watchdog has been silently observing for 14 days. Its audit log now has a baseline of what 'normal' Paperclip behaviour looks like — token burn rates, agent budget use, and how often the server / Healthchecks.io pings succeed.\n\nFlipping to active means it starts sending Telegram alerts when it spots the things it was built to spot: a token-burn spike like the 2026-04-28 incident, an agent crossing 80 percent of its monthly budget, a server-down event, or a Healthchecks.io ping failure.\n\nBefore flipping, scan the audit log for false positives so nothing surprising fires on day one.",
+    "what_to_do": "Open Terminal and run:\n\n   cd ~/claude-hq/watchdogs/paperclip && tail -200 audit.log\n\nIf the findings look reasonable, edit ~/Library/LaunchAgents/com.claude-hq.paperclip-watchdog.plist and change the --soak argument to --active, then run:\n\n   launchctl bootout gui/$(id -u)/com.claude-hq.paperclip-watchdog\n   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.claude-hq.paperclip-watchdog.plist",
+    "sent": false,
+    "sent_at": null,
+    "error": null
   }
 ]

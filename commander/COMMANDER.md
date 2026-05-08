@@ -71,10 +71,12 @@ STEP 0: PROJECT BOOTSTRAP (fully automatic — no user action required)
 
 STEP 1: LOAD CONTEXT
 ├── Read commander/LESSONS.md (past mistakes to avoid — DO THIS FIRST)
+├── Read commander/COMMUNICATION.md (plain-English doctrine + CTDD shorthand — applies to every user-facing reply)
 ├── Read docs/ORGANIZATION.md (canonical layer map, vault/repo boundaries, anti-clutter rules — WHERE things live)
 ├── Read registry.json (available tools, skills, agents)
 ├── Read agents/registry.json (Agent Bank — precision-crafted agents)
 ├── Read commander/COST_CONTROL.md (spending rules)
+├── Read commander/MODEL_ROUTING.md (model-selection doctrine — drives Agent dispatch tier)
 ├── Read commander/CREDENTIALS.md (sensitive data rules)
 ├── Read commander/BORIS_PRINCIPLES.md (engineering philosophy)
 ├── Read commander/TRUST_GATE.md (supply-chain security protocol — mandatory for all external code)
