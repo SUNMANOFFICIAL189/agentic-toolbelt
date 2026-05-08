@@ -385,3 +385,54 @@
      complementary: 17 governs how automation gets *triggered*, 20
      governs how its *effectiveness* gets measured. A propose-only
      mechanism with no measurement is half a system.
+
+### 21. Probe memory before non-trivial work — second-brain only earns its keep when it's queried
+- **Rule:** Before starting a non-trivial task, run
+  `~/claude-hq/scripts/memory-probe.sh "<task keywords>"` to sweep all
+  memory banks (Decision Log, BACKLOG, LESSONS, MemPalace, Hindsight)
+  for prior work, decisions, parked items, and rules the task should
+  respect. Surface relevant hits to the user *before* starting fresh
+  analysis. If a hit is highly relevant, propose continuing from there
+  rather than re-deriving.
+- **Why:** 2026-05-08 — Sunil pointed out that a second brain that
+  only gets queried when I happen to remember to check it isn't
+  earning its keep. The auto-loaded layers (MEMORY.md index, claude-mem
+  live context, LESSONS) cover the *small distilled* tier. The big
+  banks (MemPalace's 49,130 drawers, full Decision Log, full BACKLOG)
+  are not auto-loaded and therefore go unused unless explicitly
+  probed. Token math is heavily positive: a probe costs ~5,000 tokens
+  end-to-end; re-deriving an architectural decision because I missed
+  prior work costs 20,000-80,000 tokens. Even a 1-in-5 useful-hit rate
+  pays for itself.
+- **How to apply:**
+  1. **Trigger conditions (any one is enough):** the prompt could
+     plausibly have been worked on before · references "previous"/"we
+     discussed"/"what about" · involves a system we've touched before
+     (Paperclip, PATS, claude-hq, watchdogs, etc.) · is non-trivial
+     enough to risk re-deriving prior work · is the first message of a
+     session and the user is asking me to do something substantive.
+  2. **Skip conditions:** trivial questions ("what time is it?") ·
+     factual lookups ("what does X mean?") · continuation prompts
+     ("yes, proceed", "approve") · prompts where full context is
+     already in conversation · pure-mechanical tasks (rename a var,
+     format a file).
+  3. **Execution:** run the probe with the most distinctive keywords
+     from the user's task (3-5 words; avoid generic words like "build"
+     or "fix"). Skim the output by trust hierarchy: Decision Log →
+     BACKLOG → LESSONS → MemPalace → Hindsight. If a hit is highly
+     relevant, paraphrase it back to the user with provenance ("we
+     decided X on YYYY-MM-DD because Y") before starting work.
+  4. **Trust hierarchy when hits conflict:** Decision Log entries
+     (especially `[Sunil · strategic]` tags) > BACKLOG > LESSONS >
+     MemPalace semantic hits > Hindsight > Graphify (currently
+     deprioritised — graph is stale until clean regen per BACKLOG).
+  5. **Don't probe inside loops** — one probe per *task*, not per
+     prompt within a task. A long debugging session shouldn't probe
+     5x; it should probe once at the start.
+  6. **Failure modes:** if the probe surfaces nothing relevant, that
+     itself is signal — proceed and assume this is genuinely new work.
+     Don't probe again unless the task pivots into a new area.
+  7. **Adoption signal (per Lesson 20):** the HQ Watchdog should
+     eventually track `memory_probe_invocations_per_session` and
+     `tasks_starting_without_probe` to confirm this lesson is being
+     applied. Defer until the watchdog metric is wired (BACKLOG item).

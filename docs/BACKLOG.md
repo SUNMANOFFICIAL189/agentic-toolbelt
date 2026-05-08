@@ -479,6 +479,28 @@
 
 ---
 
+## [Open] — 2026-05-08 — Memory probe adoption metric in HQ Watchdog
+
+**What:** Wire two new metrics into `~/claude-hq/watchdog/metrics.yaml`:
+1. `memory_probe_invocations_per_session` — count of times `memory-probe.sh` is run per session.
+2. `tasks_starting_without_probe` — sessions where I started non-trivial work without first running the probe (heuristic: substantial code/file edits in the first N tool calls without a preceding probe).
+
+**Why:** Lesson 21 (added 2026-05-08) tells me to probe memory before non-trivial work. Without a measurement layer per Lesson 20, this becomes another un-instrumented behavioural rule that can silently drift to "memory of behaviour" rather than actual behaviour. The watchdog is the natural home for adoption signals.
+
+**Estimate:** 1-2 hours. Most of the work is the heuristic for "task started without probe" — needs a sliding window over the session's first 5-10 tool calls and a check for memory-probe.sh invocation.
+
+**How to start:**
+1. Add the two metric definitions to `metrics.yaml` with `plain_language` blocks per Lesson 16.
+2. Implement the detection in `watchdog/listener.py` or a metric-specific module.
+3. Calibrate thresholds after 7 days of data — what's a "normal" probe rate?
+4. After 14 days: if the probe rate is too low, surface as a Telegram nudge ("you've started 5 non-trivial tasks today without probing memory — check Lesson 21").
+
+**Acceptance:** Two metrics in `metrics.yaml` with plain-language blocks. Watchdog logs invocations. After 14 days of soak: a baseline number we can use to flag drift.
+
+**Connection:** Lesson 21 is the doctrine; this is the measurement. Without this, the lesson is half a system per Lesson 20.
+
+---
+
 ## [Open] — 2026-05-08 — graphify clean regen with `repos/` excluded
 
 **What:** The vault's `Projects/claude-hq/Graph/` was last regenerated 2026-04-21. As of today, `graphify --update` detects 2,158 changed files — but **2,079 of those are inside `~/claude-hq/repos/`** (cloned reference repos that have accumulated since April, not our source). A naive full re-extraction would burn ~60 subagents and 30+ minutes processing material that isn't ours and shouldn't be in our knowledge graph.
