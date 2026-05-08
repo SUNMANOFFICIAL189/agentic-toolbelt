@@ -557,6 +557,26 @@
 
 ---
 
+## [Open] — 2026-05-08 — Trust Gate: npm-registry-aware author resolution for bare packages
+
+**What:** When a `npm install <pkg>` command is run with a bare package name (e.g. `npm install ethers@^6`, no `@scope/`), the Trust Gate's `extract_owner()` returns empty because there's no slash. The package always falls into UNKNOWN AUTHOR, even for trusted maintainers (e.g. ethers maintained by `ricmoo` / `ethers-io` org). This forces `HQ_TRUST_OVERRIDE=1` for legitimate installs every time.
+
+**Why:** The npm registry `/{pkg}` endpoint returns repository URL + maintainer list as authoritative metadata. We can resolve `ethers@^6` → `github.com/ethers-io/ethers.js` → owner `ethers-io` and check that against the existing allowlist. Same flow as the GitHub URL parse, just one HTTP indirection.
+
+**How:**
+1. In `scripts/lib/advisory-check.sh`, add `resolve_npm_owner()`: cheap `curl https://registry.npmjs.org/{pkg}` (with timeout), parse `repository.url` field, run through existing `extract_owner` regex to pull github org.
+2. Cache results to `/tmp/trust-gate-npm-cache.json` keyed by pkg name (TTL 24h) so we don't hit npm registry on every install.
+3. If the registry resolution fails (network, 404, malformed), fall through to current UNKNOWN behavior — no regression.
+4. Update `commander/TRUST_GATE.md` Layer 0.5 docs.
+
+**Acceptance:** `npm install ethers@^6` auto-passes via the existing `ethers-io` allowlist entry (added 2026-05-08 for PATS Branch 2). `npm install some-typosquat` still falls into UNKNOWN as today. Cache invalidates correctly when a package's repository URL changes.
+
+**Estimate:** 1–2 hours. Mostly bash + curl + jq.
+
+**Source:** 2026-05-08 PATS-Copy Branch 2 build — needed `ethers@^6` for Polygon WS monitor, hit UNKNOWN AUTHOR despite ethers being one of the most-installed Ethereum libraries. Added `ethers-io` and `Polymarket` to the allowlist for git-clone path coverage but the npm-bare-package flow still requires registry-lookup to benefit.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.

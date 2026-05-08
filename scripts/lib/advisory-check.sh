@@ -30,6 +30,8 @@ ALLOWLIST=(
   "ChristopherKahler"
   "keshavsuki"
   "ruvnet"
+  "ethers-io"        # Richard Moore's ethers.js (MIT) — added 2026-05-08 for PATS-Copy Branch 2
+  "Polymarket"       # Polymarket org (MIT) — added 2026-05-08 for CTF Exchange ABI reference
 )
 
 # Self-hosted infra owned by the operator — auto-pass Layer 0.5.
