@@ -577,6 +577,151 @@
 
 ---
 
+## [Open] — 2026-05-09 — PATS-Copy: Branch 3 — geopolitics pipeline on Option D (replaces obsolete env-flag variant)
+
+**What:** Implement Branch 3 (geopolitics copy revival) as a third pipeline on the post-Option-D architecture. Same wallet list (12 geopolitics leaders from convergence backtest), same edge thesis (+$168.79/trade per multi-category backtest), but as a first-class pipeline with its own `RiskManager`, capital pool, position cap, and risk gates — NOT as an env-flag-on-shared-bot retrofit.
+
+**Why:** The original master-handoff Branch 3 design (`COPY_GEOPOLITICS_ENABLED=true`, `COPY_GEOPOLITICS_WALLETS=...`, ~30 min of work) is obsolete after the 2026-05-09 Option D architecture decision. Landing it on the shared-state design would re-create the cross-pipeline contagion problem Option D was designed to solve. The geopolitics edge (+$168.79/trade) is real and worth pursuing, but only on the better foundation. See Decision Log entry "Architecture decision: Option D" (2026-05-09).
+
+**How:**
+1. Pre-req: Option D refactor complete (BACKLOG entry above).
+2. Add `geopolitics` as a pipeline ID in the post-Option-D `Map<PipelineId, RiskManager>`.
+3. Capital allocation env var: `GEOPOLITICS_CAPITAL=<N>` (sum of all pipeline capitals ≤ `TOTAL_CAPITAL_USDC`).
+4. Build `GeopoliticsPipeline` (or extend `CopyExecutor` with a pipeline-aware filter):
+   - Watch the 12 wallets from the convergence backtest (list in master handoff)
+   - Filter to geopolitics-category markets only (use existing `market-categoriser.ts` `categoriseMarket()` function)
+   - Trade only when both wallet AND category match
+5. Watchdog: add `geopolitics-cumulative-pnl` rule (the 5th rule from the master handoff Phase 5 list, deferred to here).
+6. Paper-mode validation soak: ≥30 days with the pipeline running on paper, hitting the live-readiness combined bar (WR ≥55%, no single-day drawdown >10%, cumulative P&L positive).
+
+**Acceptance:**
+- Pipeline trades only when (wallet ∈ 12 geopolitics leaders) AND (market category == 'geopolitics')
+- Per-pipeline P&L queryable via Supabase `pipeline='geopolitics'` filter
+- Geopolitics pipeline's loss does NOT reduce signal-bot's drawdown headroom (Option D guarantee)
+- Watchdog `geopolitics-cumulative-pnl` rule emits findings if rolling-7d P&L drops below a configured floor
+
+**Estimate:** 1-2 days dev + 30 days paper soak (in parallel with Phase 4b Polymarket live ramp on signal-bot).
+
+**Sequencing:** AFTER Option D refactor. BEFORE Phase 4b live trading goes wide (geopolitics paper soak runs concurrently with signal-bot's live test on Polymarket — they're independent gates).
+
+**Source:** 2026-05-09 conversation — user asked to confirm Branch 3 status. Original env-flag plan superseded by Option D. Reframed plan documented and confirmed.
+
+---
+
+## [Open] — 2026-05-09 — PATS-Copy: Phase 4b — Polymarket live trading (signal-bot first)
+
+**What:** Enable real-money execution on Polymarket CLOB for the signal-bot pipeline (most-validated pipeline). Add a Polymarket execution path alongside the always-running PaperEngine. Other pipelines (copy-bot, geopolitics) stay paper-only initially. Per-pipeline opt-in via `<pipeline>_LIVE_TRADING=true` env vars.
+
+**Why:** Signal-bot has the most production track record (live since 2026-04-28, profitable +$287 across 55 trades pre-Phase-C, currently in Phase C with BUY disabled and SELL <24h-cap). The next step toward real revenue is moving signal-bot from paper to live with a small bankroll. Keep paper engine running as the always-on baseline for slippage/fee measurement (per Mission Board's dual-mode-parallel-execution architecture).
+
+**How:**
+1. Pre-req: Option D refactor complete + Branch 3 implemented (so per-pipeline live flags actually work).
+2. Build Polymarket live-execution path:
+   - CLOB order placement via `py-clob-client` or equivalent TS client
+   - Authentication / API key / proxy wallet setup
+   - Order types: limit orders only (no market orders for safety)
+   - Fill tracking and reconciliation against Polymarket API
+3. Per-pipeline opt-in env vars: `SIGNAL_LIVE_TRADING=true`, `COPY_LIVE_TRADING=false`, `GEOPOLITICS_LIVE_TRADING=false`.
+4. Bankroll: $500 to start (Mission Board recommendation), separate Polymarket account from paper-tracked balance.
+5. Paper engine continues running for ALL pipelines as baseline / control group — every live trade has a paper twin for slippage/fee measurement.
+6. Watchdog rules: add `live-vs-paper-divergence` (alert if live fill price differs from paper expected fill by >X%), `live-execution-failure` (alert if live order placement fails), `polymarket-api-health` (alert on persistent CLOB API errors).
+7. Daily reconciliation: live position book vs paper position book vs Supabase. Find drift early.
+
+**Acceptance:**
+- Signal-bot trades placed on real Polymarket against the $500 bankroll
+- Paper engine continues to run with the same signals for direct slippage/fee comparison
+- For ≥30 days: WR stays ≥55%, no single-day drawdown >10%, cumulative live P&L positive
+- Daily reconciliation passes (live ↔ paper ↔ Supabase all match within $5 drift)
+- After 30 days clean, this pipeline is eligible for the dYdX gate (Phase 4c)
+
+**Estimate:** 3-5 days dev (CLOB execution path is non-trivial), then 30+ days observation.
+
+**Sequencing:** AFTER Branch 3 (so all three pipelines exist on Option D). BEFORE Phase 4c (dYdX). Other pipelines (copy, geopolitics) stay paper-only during this phase — they go through their own Phase 4b later, on their own timeline, after they pass the live-readiness combined bar in paper.
+
+**Risks to flag during implementation:**
+- Polymarket CLOB has thin liquidity on long-tail markets — slippage on paper vs live can be material. Worth running a 1-week pre-flight where signals fire but DON'T execute live, just log "would have placed order at $X, current bid/ask is $Y/$Z" to estimate slippage.
+- Real-money orders need explicit kill switches — add a `LIVE_TRADING_KILL_SWITCH` env that, when set, immediately cancels open orders and stops new placements. Wire to a manual command + watchdog auto-trigger.
+
+**Source:** 2026-05-09 conversation — confirmed sequencing with Sunil. Combined-bar live gate + per-pipeline opt-in.
+
+---
+
+## [Open] — 2026-05-09 — PATS-Copy: Phase 4c-d — dYdX directional-mirror integration (post-Polymarket-live)
+
+**What:** Add dYdX as a third execution venue (alongside paper + Polymarket live), per-pipeline opt-in. Use dYdX perpetual contracts to **mirror Polymarket trade direction with leverage** on the subset of Polymarket markets that have a dYdX analog. Phase 4c is the foundation (build path, validate at 2x leverage, minimum positions). Phase 4d is scale-up (increase position sizes and leverage once verified).
+
+**Why:** dYdX perpetual contracts can amplify returns on directionally-correlated trades (e.g., Polymarket "Bitcoin above $78k by EOD" maps to dYdX BTC-PERP LONG). 2-20x leverage on the same conviction signal compounds the strategy's edge. Mission Board has the original architecture sketch from 2026-04 era; this entry consolidates and extends it to fit Option D + post-Branch-3 reality.
+
+**Confirmed direction (2026-05-09):**
+- **Use case: directional mirror with leverage** (NOT hedging, NOT standalone strategy). Same direction as Polymarket trade, leveraged 2-5x at start, on dYdX perpetual when an analog market exists.
+- **Live gate (per-pipeline combined bar):** WR ≥55% sustained 30 days AND no single-day drawdown >10% AND cumulative P&L positive AND ≥1 month after that pipeline went Phase-4b live on Polymarket.
+- **Sequencing:** AFTER Phase 4b (signal-bot Polymarket live). Each pipeline graduates independently to dYdX once it passes the gate.
+
+**Identified gaps the Mission Board doesn't address (must solve in Phase 4c):**
+
+1. **Market-mapping layer.** Most Polymarket markets have NO dYdX analog. Need a deterministic mapper:
+   - Input: Polymarket slug (e.g. `bitcoin-above-78k-on`)
+   - Output: dYdX market id (e.g. `BTC-USD`) + directional translation (Polymarket "BUY YES" = dYdX "LONG") + size translation
+   - For markets with no analog: skip dYdX, Polymarket-only execution
+   - Maintain mapping config in `dydx-market-map.json` with manual curation (high-confidence mappings only)
+
+2. **Position-sizing math.** Polymarket "$75 size at $0.92" is NOT directly equivalent to "$75 notional on dYdX at 2x leverage."
+   - Polymarket position has finite floor (-$X if NO resolves)
+   - dYdX position has continuous mark-to-market and liquidation risk
+   - Need a sizing rule: "match expected dollar P/L on a 1% adverse move" or similar
+   - Document the math, validate against historical data before going live
+
+3. **Funding rate accounting.** dYdX charges/pays funding every 8 hours.
+   - For multi-day Polymarket positions (e.g. monthly markets), funding can accumulate to material % of position
+   - Decision: cap dYdX hold duration to ≤24h (only mirror short-duration Polymarket positions)? Or track funding as a separate cost component?
+   - Recommend: cap hold duration to match Polymarket position's expected hold, with a hard 7-day max.
+
+4. **Per-pipeline subaccount strategy.** dYdX V4 has subaccounts.
+   - Recommend: per-pipeline subaccount on dYdX (signal-bot subaccount, copy-bot subaccount, geopolitics subaccount). Matches Option D's capital-pool isolation.
+   - Each subaccount has its own margin pool, position limits, P&L tracking.
+   - dYdX SDK supports multi-subaccount; cleaner accounting.
+
+5. **Liquidation safety.** Even at 2x, dYdX positions can liquidate on sharp moves.
+   - Add `MAX_LEVERAGE_PER_PIPELINE` config (start: 2x for all, raise to 5x after 30 days clean, never above 10x)
+   - Add a `dydxMarginBuffer` rule in RiskManager — never deploy more than 80% of subaccount equity to position margin
+   - Watchdog rule: alert if any subaccount equity drops below the maintenance margin floor
+
+**How (Phase 4c — foundation, 5-7 days dev + 30 days paper soak):**
+1. Build dYdX execution path: REST + WebSocket SDK (Python or TS — dYdX V4 has good support for both)
+2. Per-pipeline subaccount creation + funding (dYdX testnet first, mainnet after dev complete)
+3. Build market-mapping layer (`dydx-market-map.json`)
+4. Build sizing-translation logic (Polymarket size → dYdX notional)
+5. Build position-management module (open / close / monitor / forced-close on liquidation risk)
+6. Wire ExecutionRouter: signal → paper (always) + Polymarket live (if pipeline LIVE flag) + dYdX (if pipeline DYDX_ENABLED flag AND market has analog)
+7. Per-pipeline env vars: `<pipeline>_DYDX_ENABLED=true`, `<pipeline>_DYDX_LEVERAGE=2`, `<pipeline>_DYDX_MAX_POSITION=100`
+8. Watchdog rules: `dydx-funding-rate-spike` (alert on unusual funding), `dydx-margin-buffer-low` (alert <80% buffer), `dydx-liquidation-risk` (alert if position margin <120% maintenance), `dydx-vs-polymarket-price-drift` (alert if dYdX market price diverges from Polymarket by >X%)
+9. Phase 4c starts on testnet, then minimum-position mainnet (e.g. $50 notional at 2x = $100 effective per trade)
+
+**How (Phase 4d — scale, runs continuously after 4c proves out):**
+1. After 30 days clean on Phase 4c (WR maintained, no liquidations, no funding-rate surprises), increase position sizes on a schedule (2x notional every 14 days)
+2. Leverage stays at 2x until 90 days clean, then 3x, then re-evaluate
+3. Cap on increase: don't exceed `<pipeline>_DYDX_MAX_ALLOCATION` of pipeline's total capital
+4. Each leverage step is its own decision gate, NOT automatic
+
+**Acceptance (Phase 4c):**
+- dYdX execution path lives and tested on testnet
+- Market-mapping layer covers ≥80% of price-of-asset Polymarket markets that signal-bot trades
+- Per-pipeline subaccounts open and funded
+- 30 days mainnet at minimum positions (2x leverage, $50 notional) without: liquidation event, funding-rate surprise >2% of position, dYdX-vs-Polymarket price drift >5%, or watchdog alert escalation
+- Live P&L tracking integrated into bot status + Supabase
+
+**Acceptance (Phase 4d):**
+- Each scale-up step (2x → 4x notional, etc.) requires: prior 14 days clean + manual user confirmation. Not automatic.
+- Pipeline never exceeds `<pipeline>_DYDX_MAX_ALLOCATION` of its total capital pool
+
+**Estimate:** Phase 4c = 5-7 days dev + 30 days observation. Phase 4d = ongoing, no fixed end.
+
+**Sequencing:** AFTER Phase 4b for any given pipeline. signal-bot likely first to hit dYdX (most-validated). copy-bot and geopolitics follow on their own timelines.
+
+**Source:** 2026-05-09 conversation — Mission Board's original Phase 4c-d plan retrieved, gaps identified (market-mapping, sizing math, funding rates, subaccount strategy, liquidation safety), reframed for Option D + per-pipeline architecture. User confirmed: directional mirror, combined-bar gate, post-Polymarket-live sequencing.
+
+---
+
 ## [Open] — 2026-05-09 — PATS-Copy: per-pipeline RiskManager + capital pools (Option D refactor)
 
 **What:** Refactor the bot from one shared `RiskManager` (single balance, single drawdown breaker, single position cap, single max-loss cap) to per-pipeline `RiskManager` instances (one each for signal, copy, future Branch 3 geopolitics). Each pipeline gets a fixed capital allocation from total $6,300 (e.g. signal $4000, copy $2000, reserve $300). Single Node process, single pm2, single watchdog — but isolated capital pools and risk gates per pipeline.
