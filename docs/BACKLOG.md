@@ -577,6 +577,36 @@
 
 ---
 
+## [Open] — 2026-05-09 — PATS-Copy: per-pipeline RiskManager + capital pools (Option D refactor)
+
+**What:** Refactor the bot from one shared `RiskManager` (single balance, single drawdown breaker, single position cap, single max-loss cap) to per-pipeline `RiskManager` instances (one each for signal, copy, future Branch 3 geopolitics). Each pipeline gets a fixed capital allocation from total $6,300 (e.g. signal $4000, copy $2000, reserve $300). Single Node process, single pm2, single watchdog — but isolated capital pools and risk gates per pipeline.
+
+**Why:** Verified 2026-05-09 by direct code inspection (`risk-manager.ts:23-35`, `runner.ts:144`, `position-lifecycle.ts`): `paperEngine` + `riskManager` are single instances shared by both `signalExecutor` and `copyExecutor`. The `MAX_OPEN_POSITIONS` cap, drawdown breaker, max-loss cap, balance, and peakBalance are all *shared state*. The 2026-05-07 −$943 SELL incident drained the shared balance, reducing risk gates that copy pipeline would have computed against — bad outcomes propagate across uncorrelated strategies, the opposite of why you run multiple strategies. The Branch 3 master-handoff plan (env-flag-on-shared-bot) would land on this same flawed foundation. Splitting now means Branch 3 (and any future strategy) plugs in cleanly.
+
+**Why not full split (separate Hetzner / separate pm2 / separate repo):** Operationally expensive (2x infra, 2x watchdog, 2x heartbeat, 2x debugging surface) for diminishing returns. In-process pipeline isolation captures the value (capital + risk separation, independent tuning, trivial attribution) without the operational tax. This matches how multi-strategy hedge funds actually run: isolated capital pools, shared infrastructure.
+
+**How:**
+1. `RiskManager` constructor takes `(pipelineId, capital, riskDial, opts)`. State stays per-instance.
+2. `Runner` holds `Map<PipelineId, RiskManager>` instead of `private riskManager: RiskManager`.
+3. Each executor (`signalExecutor`, `copyExecutor`) receives its own `RiskManager` via constructor, not the shared one.
+4. Capital allocation at startup from env vars: `SIGNAL_CAPITAL`, `COPY_CAPITAL`, `RESERVE_CAPITAL` (sum ≤ `TOTAL_CAPITAL_USDC`).
+5. Supabase: add `pipeline` column to `copy_trades`, default backfill `leader_wallet === 'signal-bot' ? 'signal' : 'copy'`.
+6. Position cap becomes per-pipeline (e.g. signal cap=3, copy cap=2). `maxOpenPositions` config moves under `risk.<pipeline>` namespace.
+7. Drawdown breaker becomes per-pipeline. peakBalance persistence file gets a per-pipeline JSON structure.
+8. STATUS log shows a row per pipeline.
+9. Watchdog rules become pipeline-aware. The existing `low_priced_sell_max_loss` rule already groups by `leader_wallet` so it's halfway there — needs a pipeline column read.
+10. Branch 3 (geopolitics copy revival) plugs in as a third pipeline (or as a sub-mode of the copy pipeline with its own RiskManager).
+
+**Acceptance:** A −$1000 loss on the signal pipeline does NOT reduce the copy pipeline's available capital, drawdown headroom, or max-loss-dollar cap. Per-pipeline P&L is queryable directly from Supabase via the `pipeline` column without `leader_wallet` string filtering. The bot survives a 30-min stress test where one pipeline is forced to trade aggressively while the other remains healthy.
+
+**Estimate:** 1–2 days focused work, plus a 24h paper-mode validation soak before live.
+
+**Sequencing:** Do AFTER Phase 6 verdict on Branch 2 (don't refactor concurrently with shadow validation). Do BEFORE Branch 3 build (so Branch 3 lands on the better foundation, not retrofitted onto shared).
+
+**Source:** 2026-05-09 conversation during Branch 2 deploy. User asked whether signal + copy should run as separate entities or share state. CTDD verification confirmed shared design is the architectural shape today (see Decision Log entry "Architecture decision — Option D: per-pipeline RiskManager + capital pools" in `JARVIS-BRAIN/Projects/PATS-Copy/04 Decision Log.md`). User preference confirmed for Option D.
+
+---
+
 ## Source
 
 Captured 2026-04-22 during HQ activation conversation. User (Sunil) asked whether to install ruflo / seed / paul / TECCP into HQ. Conclusion was that adding more frameworks adds overhead without clear gain — these four actions are the higher-leverage alternatives. Full reasoning is in that session's transcript.
