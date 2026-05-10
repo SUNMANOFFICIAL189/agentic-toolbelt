@@ -606,6 +606,12 @@
 
 **Source:** 2026-05-09 conversation — user asked to confirm Branch 3 status. Original env-flag plan superseded by Option D. Reframed plan documented and confirmed.
 
+**Empirical priority anchor (added 2026-05-10):** Forensic on the March→April WR collapse + 30-day P&L data shows the bot's profitable era (March 2026: +$1,008 across 215 trades, 44.2% WR) was 100% from copy pipeline. Signal-bot solo is structurally break-even. Branch 3 is therefore the highest-priority profit lever — the structural path back to March-level monthly profits, not a side-experiment.
+
+**Mandatory feature (NOT optional):** Branch 3 must mirror leaders' position size *relative to their typical* (their conviction signal), not absolute. Flat-copying is what destroyed April 2026 — leader `0x2005d16a` (lifetime +$151k PnL on Polymarket, asymmetric-edge sizing) ramped to 42 trades on 2026-04-07 and our flat-size copy lost −$470 on that wallet alone. Without proportional sizing, Branch 3 will reproduce April's loss pattern even with the F-series fixes in place.
+
+**Full empirical justification:** Vault Decision Log entry "2026-05-10 — Forensic: March → April WR collapse + the case for restoring copy pipeline".
+
 ---
 
 ## [Open] — 2026-05-09 — PATS-Copy: Phase 4b — Polymarket live trading (signal-bot first)
@@ -749,6 +755,28 @@
 **Sequencing:** Do AFTER Phase 6 verdict on Branch 2 (don't refactor concurrently with shadow validation). Do BEFORE Branch 3 build (so Branch 3 lands on the better foundation, not retrofitted onto shared).
 
 **Source:** 2026-05-09 conversation during Branch 2 deploy. User asked whether signal + copy should run as separate entities or share state. CTDD verification confirmed shared design is the architectural shape today (see Decision Log entry "Architecture decision — Option D: per-pipeline RiskManager + capital pools" in `JARVIS-BRAIN/Projects/PATS-Copy/04 Decision Log.md`). User preference confirmed for Option D.
+
+---
+
+## [Open] — 2026-05-09 — Re-evaluate GitNexus + Composio if specific gaps surface
+
+**What:** Two HQ integration candidates evaluated 2026-05-09 and skipped. Park here so future-self can revisit without re-deriving the analysis. Full evaluation memory: `~/.claude/projects/-Users-sunil-rajput/memory/reference_gitnexus_composio_eval_2026_05_09.md`.
+
+**Why skipped:**
+- **GitNexus** (https://github.com/abhigyanpatwari/GitNexus) — ~80% of its 16 MCP tools duplicate code-review-graph already wired into HQ. PolyForm Noncommercial 1.0.0 licence permits use only "without any anticipated commercial application," which technically blocks application across PATS-Copy, Artist Video Tool, Wasserman, Corporate Brains. Two genuinely-new features (multi-repo group analysis, auto-generated per-repo skills via community detection) but no current pain point demanding them.
+- **Composio** (https://docs.composio.dev) — Hosted credential broker. Direct violation of Lessons 14 + 15 (API keys, OAuth tokens live in macOS Keychain via local launchers, never on third-party servers). No SOC-2 / data-handling disclosure below enterprise tier. Free tier 20k calls/month exists but any HQ project crossing that line hits $29/month and a COST_CONTROL.md Tier 4 approval gate. Self-host enterprise-only.
+
+**Revisit triggers (specific, measurable):**
+1. **GitNexus revisit:** code-review-graph proves blind to multi-repo / cross-project queries during Option D refactor or Branch 3 build. Concretely — if user finds themselves manually correlating changes across `~/claude-hq/scripts/` and a project repo and wishing for a single graph query that spans both, that is the moment.
+2. **Composio revisit:** Specific throwaway prototype needs ≥5 SaaS integrations in <1 day with no production credential exposure (e.g., Corporate Brains investor demo). OR: Composio publishes self-host + SOC-2 + clear data-handling at a reasonable tier.
+
+**How to start:** Re-read the evaluation memory file, re-run `WebFetch` on both URLs to refresh state (releases / pricing / licence may have moved), re-test the specific pain point that surfaced, decide integrate / skip-permanently.
+
+**Acceptance:** Decision logged either way. If integrated, add to `~/claude-hq/registry.json` with activation triggers + cost flag + Trust Gate exception note. If skipped permanently, mark this entry `[Done]` with the reason.
+
+**Estimate:** 30-60 min to re-evaluate when triggered, plus integration time if proceeding.
+
+**Source:** 2026-05-09 conversation. User asked for CTDD evaluation, accepted skip verdict, requested log for future reference rather than action. Full reasoning preserved in memory file above.
 
 ---
 
