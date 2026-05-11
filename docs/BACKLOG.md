@@ -802,9 +802,11 @@ Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Capt
 
 ---
 
-## [Open] — 2026-05-11 — [PATS-Copy] Fix `market-categoriser.ts` politics keyword gaps
+## [Done] — 2026-05-11 — [PATS-Copy] Fix `market-categoriser.ts` politics keyword gaps
 
-**What:** Add missing geopolitics keywords to `src/signals/market-categoriser.ts:KEYWORDS.politics`: `iran`, `israel`, `gaza`, `palestine`, `hamas`, `hezbollah`, `netanyahu`, `taiwan`, `north korea`, `jerusalem`, `west bank`, `middle east`, `lebanon`, `syria`, `erdogan`, `kim jong`, `coup`, `invasion`, `occupation`, `treaty`, `embassy`, `ambassador`, `diplomatic`, and several Trump-cabinet figures (`lutnick`, `noem`, `rubio`, `hegseth`). Same applies to `detectSpecialistCategory` consumer code if it has any dependent thresholds.
+**Outcome (resolved same day):** Landed in bot repo as commit `fix(categoriser): add Iran/Israel/Gaza/Netanyahu keywords to politics filter`. 28 keywords added (iran, israel, gaza, palestine, hamas, hezbollah, lebanon, syria, taiwan, north korea, jerusalem, west bank, middle east, venezuela, netanyahu, zelensky, erdogan, kim jong, starmer, lutnick, noem, rubio, hegseth, epstein, treaty, embassy, ambassador, diplomatic). Conservative scope: skipped bare ambiguous terms (war, strike, coup, invasion, occupation, china, russia) to avoid false positives on non-political contexts — sports keywords iterate first anyway. Verification: `scripts/verify-categoriser.ts` pins 36 sprint-discovered fixtures, all pass; `tsc --noEmit` clean. Branch 3 wallet-eligibility gate now sees Iran/Israel/Netanyahu titles correctly.
+
+**What (original):** Add missing geopolitics keywords to `src/signals/market-categoriser.ts:KEYWORDS.politics`: `iran`, `israel`, `gaza`, `palestine`, `hamas`, `hezbollah`, `netanyahu`, `taiwan`, `north korea`, `jerusalem`, `west bank`, `middle east`, `lebanon`, `syria`, `erdogan`, `kim jong`, `coup`, `invasion`, `occupation`, `treaty`, `embassy`, `ambassador`, `diplomatic`, and several Trump-cabinet figures (`lutnick`, `noem`, `rubio`, `hegseth`). Same applies to `detectSpecialistCategory` consumer code if it has any dependent thresholds.
 
 **Why:** The categoriser under-counts geopolitics activity. During the 2026-05-11 research sprint we found that a specialist with 26 broad-geopolitics positions only registered ~14 of those as "politics" via the current keyword list — the Iran/Israel/Netanyahu/Gaza titles fall through to 'other'. This skewed the Phase 1b watchlist audit and the Phase 3 backtest narrowing. Patch BEFORE Branch 3 ships — it currently uses the buggy categoriser for the wallet-eligibility gate.
 
