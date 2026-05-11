@@ -789,3 +789,47 @@ Items 5–11 added 2026-05-06 during the multi-model routing build session (Phas
 Items 12–13 added 2026-05-06 after the claude-mem paid-tier flip exposed two upstream quirks during backlog drain. Both non-blocking.
 
 Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Captures the Apify-class gap with three concrete paths so future-self doesn't redo the eval. ScrapeGraphAI itself was ruled out for HQ — see the entry's "Why ruled out" subsection.
+
+---
+
+## [PATS-Copy] Branch 3 Geopolitics Specialist Research Sprint — 2026-05-11
+
+**What:** Time-boxed 4-6h research sprint to validate whether geopolitics copy edge generalises beyond wallet `0x5d05b1f5` before committing to Branch 3 build. The 2026-05-11 backtest showed MIXED verdict — positive PnL but all 8 sample positions came from one wallet, which is a single point of failure for the entire pipeline economics. Build cannot start until verdict is in.
+
+**Context:** Option D shipped 2026-05-11 (per-pipeline RiskManagers + Supabase pipeline col + capital pools), which unblocks Branch 3 architecturally. Branch 3 itself is the path back to March-level monthly profits (~$1k/mo from copy pipeline alone per 2026-05-10 forensic). But the backtest sample is too thin and concentrated to ship to paper mode without first knowing whether `0x5d05b1f5` is one specialist of many or the only one.
+
+**Why this matters:** Building Branch 3 with the current 11-wallet list risks shipping a pipeline whose entire P&L depends on a single wallet's continued performance. If that wallet goes silent, changes strategy, or regresses, Branch 3 dies. Research cost (4-6h) is small relative to the cost of post-build discovery.
+
+**Scope (Phase 1-3):**
+
+1. **Phase 1 — Source candidates (1-2h):**
+   - Polymarket leaderboard top 100 wallets (last 30d, 90d, all-time)
+   - Cross-check current 11-wallet watch list — which ones were actually active in geopolitics markets in last 90d?
+   - Optional: Dune Polymarket dashboards for geopolitics-tagged markets
+
+2. **Phase 2 — Screening filter (1-2h):**
+   - Hard filters: ≥15 geopolitics-market trades in last 90d, win rate ≥55%, avg trade size $10-$500, active in last 14 days
+   - Output: ranked shortlist of 5-10 candidates
+
+3. **Phase 3 — Backtest validation (1-2h):**
+   - Re-run `~/Desktop/POLYMARKET_TRADING_3.0/scripts/backtest/branch3-geopolitics.ts` with new shortlist
+   - Compare proportional vs flat sizing on the diversified sample
+
+**Decision criteria (set in advance, no goalpost-shifting):**
+
+- Diversified positive PnL → **BUILD** Branch 3 with new wallet pool, flat sizing v1
+- `0x5d05b1f5` remains the only consistent specialist → small-cap test ($200) or **KILL** Branch 3
+- Shortlist outperforms `0x5d05b1f5` → **SWAP** in stronger wallets, build with new list
+
+**Deliverables:**
+
+- Updated `scripts/backtest/branch3-geopolitics.ts` with researched wallet list
+- Research findings doc at `~/Desktop/POLYMARKET_TRADING_3.0/_NEXT_STEPS/branch-3-research-<date>.md`
+- Obsidian Decision Log entry with verdict + provenance
+- This BACKLOG entry marked `[Done]` with outcome
+
+**Acceptance:** Verdict locked in Decision Log. If BUILD: Branch 3 build spec scoped + ready for next-session implementation. If KILL: rationale documented + Branch 3 removed from forward sequencing. If SWAP: shortlist locked + backtest harness re-validated.
+
+**Estimate:** 4-6 hours total, single session.
+
+**Source:** 2026-05-11 conversation. User asked "maybe we should research alternative geopolitics specialists first?" — CTDD analysis confirmed research-first beats build-first on this evidence. Recovery context in `~/.claude/projects/-Users-sunil-rajput/memory/project_session_handoff_2026_05_11.md` and `~/Desktop/POLYMARKET_TRADING_3.0/_NEXT_STEPS/2026-05-11-master-handoff.md`.
