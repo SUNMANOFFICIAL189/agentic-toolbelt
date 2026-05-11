@@ -792,7 +792,96 @@ Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Capt
 
 ---
 
-## [PATS-Copy] Branch 3 Geopolitics Specialist Research Sprint — 2026-05-11
+## [Done] — 2026-05-11 — [PATS-Copy] Branch 3 Geopolitics Specialist Research Sprint
+
+**Outcome (resolved 2026-05-11 same day):** Verdict **SWAP** — drop `0x5d05b1f5` from primary watch list, lead with `0x24c8cf69a0e0a17eee21f69d29752bfa32e823e1` (Phase 2 v2 passer: 149 geo positions, 62.4% WR overall, 69.6% resolved-only WR, +$142K all-time truePnl, +$116K resolved-only realized P&L, median bet $167). Keep `0x44c1dfe4` as Tier-2 candidate. Recommended sizing: **flat $75** (out-performed proportional in every cut). Sprint findings doc: `~/Desktop/POLYMARKET_TRADING_3.0/_NEXT_STEPS/branch-3-research-2026-05-11.md`. Decision Log entry: 2026-05-11 "Branch 3 research sprint COMPLETE — SWAP verdict" in `~/Vaults/Jarvis-Brain/JARVIS-BRAIN/Projects/PATS-Copy/04 Decision Log.md`.
+
+**Big surprise:** the 2026-05-11 baseline measurement was structurally biased. `gamma-api/markets?condition_ids=` silently omits resolved markets, so the original backtest could only see still-open positions — which were systematically the wallet's still-winning bets. The unbiased `/positions?user=X` endpoint reveals `0x5d05b1f5` is actually NET NEGATIVE on its own track record (−$2,405 / 53.6% WR / median bet $5.44). This bug created 4 follow-up BACKLOG items (below).
+
+**Build NOT yet started** — verdict is recommendation only, user-decision boundary respected per sprint constraints.
+
+---
+
+## [Open] — 2026-05-11 — [PATS-Copy] Fix `market-categoriser.ts` politics keyword gaps
+
+**What:** Add missing geopolitics keywords to `src/signals/market-categoriser.ts:KEYWORDS.politics`: `iran`, `israel`, `gaza`, `palestine`, `hamas`, `hezbollah`, `netanyahu`, `taiwan`, `north korea`, `jerusalem`, `west bank`, `middle east`, `lebanon`, `syria`, `erdogan`, `kim jong`, `coup`, `invasion`, `occupation`, `treaty`, `embassy`, `ambassador`, `diplomatic`, and several Trump-cabinet figures (`lutnick`, `noem`, `rubio`, `hegseth`). Same applies to `detectSpecialistCategory` consumer code if it has any dependent thresholds.
+
+**Why:** The categoriser under-counts geopolitics activity. During the 2026-05-11 research sprint we found that a specialist with 26 broad-geopolitics positions only registered ~14 of those as "politics" via the current keyword list — the Iran/Israel/Netanyahu/Gaza titles fall through to 'other'. This skewed the Phase 1b watchlist audit and the Phase 3 backtest narrowing. Patch BEFORE Branch 3 ships — it currently uses the buggy categoriser for the wallet-eligibility gate.
+
+**Estimate:** 30 min. Drop new keywords into the array, run `npm test` if any exist, commit.
+
+**How to start:**
+1. Open `src/signals/market-categoriser.ts`.
+2. Extend the `politics` keyword array with the list above (full set in `scripts/research/phase2v2-screen-via-positions.ts:GEO_KW`).
+3. Run any unit tests touching `categoriseMarket` (if absent, add a few examples from the sprint: "US forces enter Iran by March 31?", "Netanyahu out by June 30?", "Iranian regime fall before 2027?" — each should categorise as `politics`).
+4. Commit: `fix(categoriser): add Iran/Israel/Gaza/Netanyahu keywords to politics filter`.
+
+**Acceptance:** the 3 sprint-discovered test titles classify as politics. No regression on existing categorisation.
+
+**Source:** 2026-05-11 Branch 3 research sprint (Phase 2 v2 deep-dive). Sprint findings doc has full surfaced keyword set.
+
+---
+
+## [Open] — 2026-05-11 — [PATS-Copy] Branch 3 backtest harness — replace Gamma MTM with `/positions` aggregation
+
+**What:** `scripts/backtest/branch3-geopolitics.ts` STAGE 3a uses `gamma-api.polymarket.com/markets?condition_ids=<cid>` to compute MTM. Gamma silently omits resolved markets — so the harness systematically excludes the wallet's longest-standing realised wins/losses. Replace this MTM source with `/positions?user=<wallet>&limit=500` (one call per wallet, returns per-position `cashPnl + realizedPnl` including resolved-redeemable positions).
+
+**Why:** This bias is what produced the misleading 2026-05-11 baseline verdict. Sprint Phase 3 re-run with new shortlist suffered from the same bias (119/177 positions skipped). The harness CANNOT measure cumulative geopolitics-specialist edge without this fix. Without it, every future Branch 3 calibration run will repeat the bias.
+
+**Estimate:** 2-3 hours. Refactor STAGE 3a-b to fetch /positions per leader, join trades by conditionId+outcomeIndex, use truePnl = cashPnl + realizedPnl as the position outcome.
+
+**How to start:**
+1. Build a `fetchPositions(wallet)` helper modelled on `scripts/research/phase2v2-screen-via-positions.ts:fetchPositions`.
+2. For each leader, fetch /positions ONCE, build a map keyed by `${conditionId}|${outcomeIndex}` → { cashPnl, realizedPnl, isResolved }.
+3. In the per-position economic accounting (STAGE 3b/4), use truePnl from this map instead of (cashFlow + netShares × Gamma price).
+4. Keep the current Gamma path as a fallback or remove entirely.
+5. Re-run with the same WATCHED_WALLETS as Phase 3 sprint to verify the result matches /positions reality.
+
+**Acceptance:** Backtest verdict for the sprint shortlist `[0x24c8cf69, 0x5d05b1f5]` matches the /positions data direction: challenger > baseline by a wide margin.
+
+**Source:** 2026-05-11 Branch 3 research sprint Phase 3 — full caveat documented in sprint findings doc.
+
+---
+
+## [Open] — 2026-05-11 — [PATS-Copy] Fix leaderboard fetcher DOM virtualisation cap
+
+**What:** `scripts/research/phase1a-leaderboard-fetch.ts` (and by extension the production `src/leaderboard/scraper.ts` Puppeteer path) scrapes wallet addresses from the rendered DOM. React virtualised lists only render visible rows — so the scrape caps at 27-35 wallets per time window, not the full top-100. Fix the fetcher to either (a) programmatically scroll past the virtualisation buffer, or (b) intercept the lazy XHR the leaderboard frontend MUST be making for paginated rows (recon script `scripts/research/phase1-leaderboard-recon.ts` captured no obvious leaderboard XHR but a fresh deeper inspection might find it).
+
+**Why:** Sprint Phase 1a only got 71 unique candidates across 3 windows. With proper top-100 across 3 windows the candidate pool would be 200-250 (after overlap dedup), giving Phase 2 v2 much more material to find diversified specialists. The current SWAP recommendation rests on 1 strong wallet + 1 tier-2 — exactly the concentration risk the sprint was meant to address.
+
+**Estimate:** 2-3 hours. Scroll-to-load approach is simpler; XHR-intercept is cleaner.
+
+**How to start:**
+1. Re-run `scripts/research/phase1-leaderboard-recon.ts` with response-body capture enabled (currently captures URLs + first-200-chars previews — extend to full bodies > 1KB for the candidate URLs).
+2. Look for any URL that returns >100 wallet addresses or a clearly paginated structure (`{results: [...], next: '...'}` or similar).
+3. If no XHR is found, implement scroll-to-bottom-N-times in `phase1a-leaderboard-fetch.ts` (the existing scroll loop has maxScrolls=8 but the leaderboard may need 20+ to load row 100).
+
+**Acceptance:** Each time window yields ≥80 wallets. Combined unique pool ≥200.
+
+**Source:** 2026-05-11 Branch 3 research sprint Phase 1a observation.
+
+---
+
+## [Open] — 2026-05-11 — [PATS-Copy] Adopt `/positions` as first-class leader-evaluation signal
+
+**What:** Polymarket's `data-api.polymarket.com/positions?user=<wallet>&limit=500` returns per-position `cashPnl + realizedPnl` for every position a wallet currently holds, including resolved-but-redeemable ones. This is the closest thing to ground-truth wallet edge measurement on Polymarket. Currently the bot's leader scoring (`src/leaderboard/scorer.ts`) uses composite of WR + profit factor + frequency + recency derived from leaderboard scrape data. /positions data is richer and more decisive.
+
+**Why:** Both the 2026-05-11 baseline and the Phase 3 backtest re-run produced misleading verdicts because they relied on trade-derived or Gamma-derived position-state inference. The /positions endpoint resolves this directly. Should become part of the leader-eligibility flow, not just an ad-hoc research tool.
+
+**Estimate:** 3-4 hours for an MVP integration. Cache /positions per wallet for 5-10 minutes, expose `getLeaderEdgeSummary(wallet)` returning `{ totalGeoPositions, resolvedWr, allTimeTruePnl, medianBet, lastTradeAge }`. Optionally fold into the composite score (would need tuning).
+
+**How to start:**
+1. Lift `fetchPositions` + `isGeopolitics` helpers from `scripts/research/phase2v2-screen-via-positions.ts` into a new `src/leaderboard/positions-evaluator.ts`.
+2. Add a unit test pinning the helpers' output against a known fixture (capture the live response from `0x24c8cf69` into `tests/fixtures/positions-0x24c8cf69.json`).
+3. Wire into the watcher promotion/demotion logic OR expose as a stand-alone CLI for ad-hoc audits.
+
+**Acceptance:** A new wallet can be audited via `node-script-or-CLI <wallet>` returning the per-position edge summary in <2 seconds.
+
+**Source:** 2026-05-11 Branch 3 research sprint — the /positions endpoint was the discovery that resolved the baseline ambiguity.
+
+---
+
+## [PATS-Copy] Branch 3 Geopolitics Specialist Research Sprint — 2026-05-11 (HISTORICAL — sprint definition)
 
 **What:** Time-boxed 4-6h research sprint to validate whether geopolitics copy edge generalises beyond wallet `0x5d05b1f5` before committing to Branch 3 build. The 2026-05-11 backtest showed MIXED verdict — positive PnL but all 8 sample positions came from one wallet, which is a single point of failure for the entire pipeline economics. Build cannot start until verdict is in.
 
