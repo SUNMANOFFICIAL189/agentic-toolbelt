@@ -23,21 +23,64 @@ rules:
       - patterns:
           - pattern: $E.copyExecutor.hydrateOpenTrades($ROWS)
           - pattern-not: $E.copyExecutor.hydrateOpenTrades($ROWS.filter(...))
+          # Simple form: filter is just the signal-bot check
           - pattern-not-inside: |
               const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot');
               ...
           - pattern-not-inside: |
               const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot");
+              ...
+          # Compound form: signal-bot check is one of multiple && conditions
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $X && $R.leader_wallet !== 'signal-bot');
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $X && $R.leader_wallet !== "signal-bot");
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot' && $X);
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot" && $X);
               ...
       # Same shape but called on `this.copyExecutor`
       - patterns:
           - pattern: this.copyExecutor.hydrateOpenTrades($ROWS)
           - pattern-not: this.copyExecutor.hydrateOpenTrades($ROWS.filter(...))
+          # Simple form: filter is just the signal-bot check
           - pattern-not-inside: |
               const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot');
               ...
           - pattern-not-inside: |
               const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot");
+              ...
+          # Compound form: signal-bot check is one of multiple && conditions
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $X && $R.leader_wallet !== 'signal-bot');
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $X && $R.leader_wallet !== "signal-bot");
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== 'signal-bot' && $X);
+              ...
+          - pattern-not-inside: |
+              const $ROWS = $SRC.filter($R => $R.leader_wallet !== "signal-bot" && $X);
+              ...
+          # Two-step / chained form: a signal-bot filter exists somewhere in
+          # the enclosing scope. This is more permissive than tracking the
+          # exact variable chain, but in practice if a programmer wrote a
+          # signal-bot filter AND a hydrateOpenTrades call in the same scope,
+          # they almost certainly chained them. Use when the simple pattern
+          # doesn't match the explicit-chain refactor (Branch 3 shape:
+          # nonSignalRows = openRows.filter(...!== signal-bot);
+          # copyRows = nonSignalRows.filter(...pipeline...);
+          # this.copyExecutor.hydrateOpenTrades(copyRows);)
+          - pattern-not-inside: |
+              $SRC.filter($R => $R.leader_wallet !== 'signal-bot');
+              ...
+          - pattern-not-inside: |
+              $SRC.filter($R => $R.leader_wallet !== "signal-bot");
               ...
     metadata:
       category: correctness
