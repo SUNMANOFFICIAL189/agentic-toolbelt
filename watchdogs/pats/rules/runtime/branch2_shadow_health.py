@@ -182,40 +182,34 @@ def main() -> int:
     if summary is not None:
         total = int(summary.group(1))
         matched = int(summary.group(2))
-        rest_only = int(summary.group(3))
-        ws_only = int(summary.group(4))
+        # groups 3 (rest_only) and 4 (ws_only) intentionally not parsed —
+        # they would only feed the disabled divergence-recall-low check below.
         recall_str = summary.group(5)
         delta_str = summary.group(6)
 
-        # Only score recall if there's a meaningful sample
-        if recall_str.endswith("%") and total >= 20:
-            recall = float(recall_str.rstrip("%")) / 100.0
-            if recall < RECALL_THRESHOLD:
-                emit(Finding(
-                    rule_id=f"{RULE_PREFIX}.divergence-recall-low",
-                    severity="warn",
-                    what_happened=(
-                        f"Over the most recent shadow-window summary, the Branch 2 "
-                        f"WebSocket listener saw only {recall * 100:.1f}% of the trades "
-                        f"the existing REST monitor caught. The promotion target is "
-                        f"95% — at this level the WebSocket path is missing real "
-                        f"trades and isn't ready to take over from REST polling."
-                    ),
-                    what_to_do=(
-                        "Check the 'Divergence: REST-ONLY' lines in pm2 logs to see "
-                        "which trades the listener missed. Common causes: a different "
-                        "matchOrders selector path that the decoder doesn't recognise, "
-                        "or the watched-wallet list drifting between the two monitors. "
-                        "Phase 6 promotion is blocked until recall passes 95%."
-                    ),
-                    technical_detail={
-                        "matched": matched,
-                        "rest_only": rest_only,
-                        "ws_only": ws_only,
-                        "ws_recall": recall,
-                        "threshold": RECALL_THRESHOLD,
-                    },
-                ))
+        # ─── divergence-recall-low DISABLED 2026-05-11 ─────────────────────
+        # The 'recall' metric assumes REST/data-api is ground truth. CTDD
+        # forensic on 2026-05-10 proved this is wrong: data-api filters
+        # certain trades for unknown reasons, so a low recall % doesn't
+        # actually indicate WS missing trades — it indicates REST not
+        # showing trades that WS correctly detected.
+        #
+        # Verified in 2026-05-11 50-trade test: WS catches 100% of REST's
+        # trades AND additional trades data-api doesn't index. The rule
+        # firing produces alert noise on a structurally invalid premise.
+        #
+        # Replacement options under consideration (not yet built):
+        # - WS-side coverage check against on-chain ground truth
+        # - Per-pipeline detection-rate health (once Branch 3 lands)
+        #
+        # For now: this sub-check is disabled. Other sub-checks remain
+        # active: ws-disconnected, no-blocks, divergence-latency-slow.
+        # ───────────────────────────────────────────────────────────────────
+        # if recall_str.endswith("%") and total >= 20:
+        #     recall = float(recall_str.rstrip("%")) / 100.0
+        #     if recall < RECALL_THRESHOLD:
+        #         emit(Finding(...))
+        _ = recall_str  # silence unused-variable lint while the block is disabled
 
         if delta_str.endswith("ms") and total >= 20:
             delta_ms = int(delta_str.rstrip("ms"))

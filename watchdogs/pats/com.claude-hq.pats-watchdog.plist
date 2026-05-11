@@ -12,7 +12,13 @@
     launchctl bootout gui/$(id -u)/com.claude-hq.pats-watchdog
     rm ~/Library/LaunchAgents/com.claude-hq.pats-watchdog.plist
 
-  First 14 days: observe-only soak (--soak flag). After soak, change --soak to --active.
+  Activated 2026-05-11: flipped from --soak to --active.
+  - Branch 2 shadow window proved the divergence-recall-low metric was invalid
+    (data-api not ground truth); that sub-check was disabled in
+    branch2_shadow_health.py before flip to avoid alert spam on a broken premise.
+  - Other rules (ws-disconnected, no-blocks, divergence-latency-slow,
+    supabase-consistency, low-priced-SELL, pnl-write-reliability) remain active.
+  - Telegram routes warn alerts at 1-hour cooldown, critical alerts immediately.
 -->
 <plist version="1.0">
 <dict>
@@ -30,7 +36,7 @@
     <string>/usr/bin/env</string>
     <string>python3</string>
     <string>/Users/sunil_rajput/claude-hq/watchdogs/pats/orchestrator.py</string>
-    <string>--soak</string>
+    <string>--active</string>
   </array>
 
   <key>StandardOutPath</key>
