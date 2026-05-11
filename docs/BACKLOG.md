@@ -824,9 +824,13 @@ Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Capt
 
 ---
 
-## [Open] — 2026-05-11 — [PATS-Copy] Branch 3 backtest harness — replace Gamma MTM with `/positions` aggregation
+## [Open — partial] — 2026-05-11 — [PATS-Copy] Branch 3 backtest harness — replace Gamma MTM with combined `/positions` + `/trades`-flow aggregation
 
-**What:** `scripts/backtest/branch3-geopolitics.ts` STAGE 3a uses `gamma-api.polymarket.com/markets?condition_ids=<cid>` to compute MTM. Gamma silently omits resolved markets — so the harness systematically excludes the wallet's longest-standing realised wins/losses. Replace this MTM source with `/positions?user=<wallet>&limit=500` (one call per wallet, returns per-position `cashPnl + realizedPnl` including resolved-redeemable positions).
+**Progress update (2026-05-11 same-day):** Partially resolved. The SCREENING path (`scripts/research/phase2v3-screen-combined.ts`) now uses the corrected combined measurement: union of `/positions` per-position (cashPnl + realizedPnl, for buy-and-hold wallets) + `/trades`-derived cashflow for fully-exited-via-sale positions (sell-out wallets like CreamCream1215 audited the same day). Surfaced 12-wallet diversified shortlist for Branch 3 vs the v2 single-passer. Decision Log entry 2026-05-11 "Branch 3 verdict UPGRADED" documents the result.
+
+**Still open:** the BACKTEST HARNESS itself (`scripts/backtest/branch3-geopolitics.ts`) STAGE 3a/3b still calls Gamma. The verdict-driving measurement is now correct at the screening layer, but if anyone re-runs the Phase 3 backtest the harness will produce selection-biased numbers (same as the original 2026-05-11 baseline). Patch BEFORE rerunning the backtest in Phase 3 of any future calibration.
+
+**What (original):** `scripts/backtest/branch3-geopolitics.ts` STAGE 3a uses `gamma-api.polymarket.com/markets?condition_ids=<cid>` to compute MTM. Gamma silently omits resolved markets — so the harness systematically excludes the wallet's longest-standing realised wins/losses. Replace this MTM source with combined `/positions` + `/trades`-flow logic (see `scripts/research/phase2v3-screen-combined.ts` for the canonical implementation pattern).
 
 **Why:** This bias is what produced the misleading 2026-05-11 baseline verdict. Sprint Phase 3 re-run with new shortlist suffered from the same bias (119/177 positions skipped). The harness CANNOT measure cumulative geopolitics-specialist edge without this fix. Without it, every future Branch 3 calibration run will repeat the bias.
 
@@ -845,9 +849,13 @@ Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Capt
 
 ---
 
-## [Open] — 2026-05-11 — [PATS-Copy] Fix leaderboard fetcher DOM virtualisation cap
+## [Done] — 2026-05-11 — [PATS-Copy] Fix leaderboard fetcher DOM virtualisation cap
 
-**What:** `scripts/research/phase1a-leaderboard-fetch.ts` (and by extension the production `src/leaderboard/scraper.ts` Puppeteer path) scrapes wallet addresses from the rendered DOM. React virtualised lists only render visible rows — so the scrape caps at 27-35 wallets per time window, not the full top-100. Fix the fetcher to either (a) programmatically scroll past the virtualisation buffer, or (b) intercept the lazy XHR the leaderboard frontend MUST be making for paginated rows (recon script `scripts/research/phase1-leaderboard-recon.ts` captured no obvious leaderboard XHR but a fresh deeper inspection might find it).
+**Outcome (resolved same day):** Solved via the SSR API instead of fixing the DOM scrape. Discovered the underlying route pattern: `polymarket.com/_next/data/<buildId>/en/leaderboard/<category>/<window>/<sort>.json` — one fetch returns the React Query dehydrated state with all 3 sort variants (profit / volume / biggestWins) for that (category × window). For politics across 4 windows: **134 unique wallets** with rich metadata (rank, name, pseudonym, amount, pnl, volume, realized, unrealized) vs the v1 DOM scrape's 71. Replaces the Puppeteer + DOM virtualisation path entirely — no browser needed.
+
+Implementation: `scripts/research/phase1a-v2-politics-leaderboard.ts`. Build ID discovered automatically from the leaderboard HTML (regex `build-[A-Za-z0-9_-]+`). Output: `_NEXT_STEPS/branch-3-phase1a-v2-politics.json`. Unlocked the diversified-shortlist verdict for Branch 3 (12 passers vs 1 — see 2026-05-11 Decision Log "Branch 3 verdict UPGRADED").
+
+**What (original):** `scripts/research/phase1a-leaderboard-fetch.ts` (and by extension the production `src/leaderboard/scraper.ts` Puppeteer path) scrapes wallet addresses from the rendered DOM. React virtualised lists only render visible rows — so the scrape caps at 27-35 wallets per time window, not the full top-100. Fix the fetcher to either (a) programmatically scroll past the virtualisation buffer, or (b) intercept the lazy XHR the leaderboard frontend MUST be making for paginated rows (recon script `scripts/research/phase1-leaderboard-recon.ts` captured no obvious leaderboard XHR but a fresh deeper inspection might find it).
 
 **Why:** Sprint Phase 1a only got 71 unique candidates across 3 windows. With proper top-100 across 3 windows the candidate pool would be 200-250 (after overlap dedup), giving Phase 2 v2 much more material to find diversified specialists. The current SWAP recommendation rests on 1 strong wallet + 1 tier-2 — exactly the concentration risk the sprint was meant to address.
 
