@@ -902,6 +902,54 @@ Implementation: `scripts/research/phase1a-v2-politics-leaderboard.ts`. Build ID 
 
 ---
 
+## [Open] — 2026-05-11 — [PATS-Copy] Branch 3 Tier-1 auto-promotion loop (Phase A → B → C)
+
+**What:** Close the loop on the static Tier-1 geopolitics watchlist by making it self-maintaining. Today (post Branch 3 build, commit `eb56980`), the Tier-1 list is hardcoded in `src/geopolitics/watchlist.ts` and requires manual edit + redeploy to change. As new geopolitics specialists emerge on Polymarket, we need a system that (a) detects them, (b) decides whether to promote, (c) acts on the decision — with watchdog backstop monitoring runtime performance afterwards. Build staged across three phases, each with its own kill-switch verification gate.
+
+**Why:** The static-list architecture has a real gap — nothing today is automatically surfacing "a new wallet appeared that passes our filters". Without a closing mechanism, the watchlist quietly drifts out of date as the trader population evolves. Manual re-screening depends on Sunil remembering to do it.
+
+Doctrinally (per feedback memory `feedback_automate_when_rules_airtight.md`, 2026-05-11): if rules are airtight and Claude would recommend on rule-pass, automate the promotion. Manual gates that don't add signal are ceremony. The right architecture is rich-rules + auto-execute + watchdog backstop + safety rails (churn cap, watchlist snapshotting). NOT a permanent manual approval gate.
+
+**Why staged (not all-at-once):** Building full auto-promote today means locking in rules based on one observed miss (`yyyy77777` Tier-2 case). Not enough observation to be confident. CTDD says: don't ship automation faster than observation supports.
+
+**Scope (sequenced, each phase gated):**
+
+### Phase A — Watchdog weekly diff alert (~1–2h, schedule: NEXT SESSION)
+- Cron runs `scripts/research/phase1a-v2-politics-leaderboard.ts` + `phase2v3-screen-combined.ts` weekly
+- Diffs result against current `TIER_1` in `src/geopolitics/watchlist.ts`
+- Telegrams plain-English alert: new passers + existing Tier-1 underperformers
+- Zero impact on the bot. Pure visibility.
+- Each weekly diff is a test case for Phase B (would current rules promote this? would I override? why?)
+- Verification gate: runs cleanly, alerts useful, no false-positive flood
+
+### Phase B — Rule set v2 (~3h, schedule: WEEK 2 OF PAPER SOAK)
+- Use Phase A diff data to identify rules currently missing
+- Extract implicit human judgements into deterministic rules. Initial candidate set:
+  - `truePnl > 0` (deal-breaker even at high WR — catches `yyyy77777`)
+  - WR consistency: ≥55% in BOTH last-30d AND last-90d windows (catches lucky streaks)
+  - Sample size: ≥30 positions (was ≥15 — too noisy)
+  - Wallet age: ≥60 days (catches Sybils / brand-new accounts)
+  - Cooling-off check: internal `geopolitics-cooling-off` list maintained when wallets pull stunts
+  - Strategy-type sanity: flag wallets whose P&L is heavily from disputed-market UMA resolutions (different mechanism than directional prediction)
+- Verification gate: enriched rule set, applied retroactively to Phase A diffs, correctly identifies wallets that would have been manually rejected
+
+### Phase C — Auto-promote + churn cap + snapshotting (~3–4h, schedule: AFTER PAPER SOAK PASSES)
+- Cron wraps Phase A+B into a single decision pipeline
+- New passer found AND not in TIER_1 → auto-add (commit + push + watchdog alert)
+- Existing Tier-1 fails rules → auto-remove
+- Every change: snapshot `watchlist.ts` to date-stamped backup (`watchlist-snapshots/2026-XX-XX.ts`) for one-command revert
+- **Churn cap:** if >2 changes pending in any cycle → PAUSE auto-action, alert with full diff, require manual `ack` to apply. Catches regime shifts where the whole landscape is moving.
+- Watchdog rules running in parallel: per-wallet truePnl ≥ 0 rolling 30d, activity ≥1 trade/14d, alert on Tier-1 entry/exit events
+- Verification gate: dry-run auto-promote against last 4 weeks of Phase A diffs → confirm it produces same decisions a manual reviewer would
+
+**Estimate:** ~7–10h total spread across three sessions. Phase A blocks B (uses A's data). B blocks C (rules need to be enriched first). C blocks live activation (requires soak verdict to confirm Branch 3 itself works).
+
+**Acceptance per phase:** see verification gates above. Final acceptance for full loop: 4-week trailing dry-run matches manual decisions ≥95% of cases, churn cap fires correctly on synthetic regime-shift test, snapshot-based revert verified working.
+
+**Source:** 2026-05-11 — conversation about whether the Branch 3 static watchlist can incorporate new wallets. Sunil pushed back on Claude's default of "manual approval forever"; Claude's CTDD-honest concession produced the staged automation plan. Doctrine captured in `feedback_automate_when_rules_airtight.md`.
+
+---
+
 ## [PATS-Copy] Branch 3 Geopolitics Specialist Research Sprint — 2026-05-11 (HISTORICAL — sprint definition)
 
 **What:** Time-boxed 4-6h research sprint to validate whether geopolitics copy edge generalises beyond wallet `0x5d05b1f5` before committing to Branch 3 build. The 2026-05-11 backtest showed MIXED verdict — positive PnL but all 8 sample positions came from one wallet, which is a single point of failure for the entire pipeline economics. Build cannot start until verdict is in.
