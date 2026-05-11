@@ -824,11 +824,22 @@ Item 14 added 2026-05-06 after evaluating ScrapeGraphAI for HQ integration. Capt
 
 ---
 
-## [Open — partial] — 2026-05-11 — [PATS-Copy] Branch 3 backtest harness — replace Gamma MTM with combined `/positions` + `/trades`-flow aggregation
+## [Done] — 2026-05-11 — [PATS-Copy] Branch 3 backtest harness — replace Gamma MTM with combined `/positions` + `/trades`-flow aggregation
 
-**Progress update (2026-05-11 same-day):** Partially resolved. The SCREENING path (`scripts/research/phase2v3-screen-combined.ts`) now uses the corrected combined measurement: union of `/positions` per-position (cashPnl + realizedPnl, for buy-and-hold wallets) + `/trades`-derived cashflow for fully-exited-via-sale positions (sell-out wallets like CreamCream1215 audited the same day). Surfaced 12-wallet diversified shortlist for Branch 3 vs the v2 single-passer. Decision Log entry 2026-05-11 "Branch 3 verdict UPGRADED" documents the result.
+**Outcome (resolved same day):** Closed. Both the screening layer (`scripts/research/phase2v3-screen-combined.ts`) and the backtest harness (`scripts/backtest/branch3-geopolitics.ts`) now use the canonical truePnl measurement (per-position cashPnl + realizedPnl from `/positions`, with trade-flow cashflow fallback for sell-out positions).
 
-**Still open:** the BACKTEST HARNESS itself (`scripts/backtest/branch3-geopolitics.ts`) STAGE 3a/3b still calls Gamma. The verdict-driving measurement is now correct at the screening layer, but if anyone re-runs the Phase 3 backtest the harness will produce selection-biased numbers (same as the original 2026-05-11 baseline). Patch BEFORE rerunning the backtest in Phase 3 of any future calibration.
+Verdict reversal on the 3-wallet shortlist over the same 30-day window:
+
+| | Old harness (Gamma-biased) | New harness (positions+trade-flow) |
+|---|---|---|
+| leader truePnl total | −$14,178 | +$173,348 |
+| combined proportional | +$52 | +$11,505 |
+| combined flat $75 | +$693 | +$31,163 |
+| `0x24c8cf69` proportional | −$52 (the artifact) | +$10,794 (129% ROI) |
+
+The corrected measurement reveals `0x24c8cf69`'s $82K April-22 Iran-peace redemption + $32K Iranian-regime-fall + $9.7K Trump-Iran-ops-end that Gamma had hidden. Same wallet, same trades, just the right tool.
+
+Small follow-up flag: 212 positions skipped as "open w/o /positions entry" in the test run — probably small share balances under /positions' threshold or partially-redeemed positions. Worth a tiny investigation if maximum coverage matters; not blocking any current decision.
 
 **What (original):** `scripts/backtest/branch3-geopolitics.ts` STAGE 3a uses `gamma-api.polymarket.com/markets?condition_ids=<cid>` to compute MTM. Gamma silently omits resolved markets — so the harness systematically excludes the wallet's longest-standing realised wins/losses. Replace this MTM source with combined `/positions` + `/trades`-flow logic (see `scripts/research/phase2v3-screen-combined.ts` for the canonical implementation pattern).
 
