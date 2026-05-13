@@ -1,10 +1,10 @@
 {
   "version": "2.0.0",
-  "last_updated": "2026-05-05",
+  "last_updated": "2026-05-13",
   "owner": "SUNMANOFFICIAL189",
   "identity": "CLAUDE HQ",
   "description": "The central command center for JARVIS \u2014 an autonomous agentic system. Claude always references this for major projects. Commander orchestrates all tools.",
-  "tool_count": 35,
+  "tool_count": 36,
   "skill_count": 10,
   "auto_trigger_rules": [
     "ANY PRD provided or referenced by the user triggers CLAUDE HQ activation \u2014 this means a long-running project",
@@ -1215,7 +1215,11 @@
         "type": "free",
         "notes": "Open source, runs locally in dedicated venv"
       },
-      "dependencies": ["python>=3.10", "playwright (auto-installed)", "Chromium binaries (auto-fetched ~150MB)"],
+      "dependencies": [
+        "python>=3.10",
+        "playwright (auto-installed)",
+        "Chromium binaries (auto-fetched ~150MB)"
+      ],
       "setup_instructions": {
         "method": "venv + pip",
         "venv_path": "~/claude-hq/.venv-crawl4ai",
@@ -1262,7 +1266,9 @@
       "dependencies": [],
       "setup_instructions": {
         "method": "no_setup",
-        "commands": ["# No install. Optional: get a free key at https://jina.ai/ and export JINA_API_KEY"]
+        "commands": [
+          "# No install. Optional: get a free key at https://jina.ai/ and export JINA_API_KEY"
+        ]
       },
       "wrapper": {
         "cli": "~/claude-hq/scripts/fetch-page.sh <url>  # quick mode is the default",
@@ -1273,6 +1279,45 @@
       "priority": "HIGH",
       "status": "active",
       "added_date": "2026-05-06"
+    },
+    {
+      "id": "agent-native",
+      "name": "Agent-Native Framework (BuilderIO)",
+      "source": "https://github.com/BuilderIO/agent-native",
+      "type": "github_repo",
+      "category": "saas_framework",
+      "owner": "BuilderIO",
+      "description": "TypeScript framework for building agentic SaaS apps where UI + agent are equal citizens sharing one database/state. Templates (Mail, Calendar, Slides, Video, Analytics, Clips, Forms, Content, Dispatch, Design) replace commercial SaaS \u2014 fork, customise, own. Actions defined once serve both agent (as tool) and frontend (as HTTP endpoint). Built on Drizzle + Nitro + React + Remotion + Yjs + shadcn/ui + Cloudflare Workers.",
+      "activation_triggers": [
+        "Get-Rich-Scheme SaaS-pipeline deliverable scoping",
+        "User wants to build an owned alternative to a commercial SaaS (Superhuman / Calendly / Mixpanel / Loom / Typeform / Notion-shaped)",
+        "Project scope includes BOTH a polished user-facing UI AND an integrated AI agent on shared state",
+        "User wants apps that can modify their own source code over time"
+      ],
+      "anti_triggers": [
+        "HQ brain extensions or Commander orchestration enhancements (wrong altitude - agent-native is project-level)",
+        "Non-SaaS projects (CLI tools, libraries, autonomous bots, daemons, research scripts)",
+        "Projects without a strong user-facing UI requirement",
+        "Production use without first completing the 4 pre-install gates (verify LICENSE, Trust Gate Tier C, pin commit hash, accept stack lock-in)"
+      ],
+      "dependencies": [
+        "Trust Gate Tier C review on first clone (BuilderIO/steve8708 not on HQ allowlist)",
+        "Verify LICENSE file content (README claims MIT, GitHub metadata field is null)",
+        "Pin commit hash - no formal version tag released as of 2026-05-13",
+        "Stack acceptance: Drizzle + Nitro + React + Remotion + Yjs + shadcn + Cloudflare Workers + partial BuilderIO commercial coupling"
+      ],
+      "setup_instructions": {
+        "method": "candidate_only",
+        "command": "DO NOT auto-install. When Get-Rich-Scheme triggers, surface as one candidate among options. Run pre-install gates first.",
+        "backlog_reference": "~/claude-hq/docs/BACKLOG.md - entry dated 2026-05-13 'Register agent-native as Get-Rich-Scheme framework candidate'"
+      },
+      "integration_notes": "CTDD evaluated 2026-05-13. Verdict: NOT for HQ brain; CANDIDATE for Get-Rich-Scheme. Full eval at ~/.claude/projects/-Users-sunil-rajput/memory/project_repo_eval_agent_native.md. Bus factor 1 (Steve Sewell + Claude; 47% AI-coauthored). 2 months old, no formal release tag. Strong engineering signals: 10+ CI guard scripts (no-drizzle-push, no-unscoped-queries, db-tool-scoping, extension-no-public, etc.) - each a scar from a real production incident. License ambiguity (README says MIT, metadata null) MUST be resolved before any install.",
+      "priority": "MEDIUM",
+      "status": "candidate",
+      "added_date": "2026-05-13",
+      "pinned_sha_at_registration": "64792af52bfcde18594263ea6b8dbfabe3aa0679",
+      "pinned_sha_date": "2026-05-12T21:03:51Z",
+      "local_snapshot": "~/.claude/projects/-Users-sunil-rajput/memory/snapshots/2026-05-13-repo-evaluations/agent-native/"
     }
   ],
   "skills": [

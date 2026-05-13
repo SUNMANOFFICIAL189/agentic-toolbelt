@@ -991,3 +991,137 @@ Doctrinally (per feedback memory `feedback_automate_when_rules_airtight.md`, 202
 **Estimate:** 4-6 hours total, single session.
 
 **Source:** 2026-05-11 conversation. User asked "maybe we should research alternative geopolitics specialists first?" — CTDD analysis confirmed research-first beats build-first on this evidence. Recovery context in `~/.claude/projects/-Users-sunil-rajput/memory/project_session_handoff_2026_05_11.md` and `~/Desktop/POLYMARKET_TRADING_3.0/_NEXT_STEPS/2026-05-11-master-handoff.md`.
+
+---
+
+## [Open] — 2026-05-12 — PATS-Copy: extend per-pipeline balance tracking to signal + copy executors
+
+**What:** Today's Option D fix wired per-pipeline `poolBalance` tracking into `geopolitics-executor.ts` so its `RiskManager` drawdown breaker operates on the geopolitics pool only. The same wiring is still pending for `signal-executor.ts` and `copy-executor.ts` — both call `riskManager.checkTrade()` on their per-pipeline RM, but nothing updates that RM's balance after open/close. Result: signal/copy pipelines currently have NO active drawdown breaker (their RM balance is static, DD stays at 0%, gate is a no-op). The bot-wide breaker that previously fired on signal-pipeline losses was removed today to fix the pipeline isolation leak.
+
+**Why:** Before flipping `PAPER_MODE=false` (live trading) on signal or copy, each pipeline needs its drawdown breaker actually wired. Right now those pipelines have per-trade max-loss caps (`MAX_LOSS_PCT_PER_TRADE`) and per-trade size caps, but no aggregate "stop trading if this pool draws down >14%" gate. Acceptable in paper mode (no real $ at risk); not acceptable for live.
+
+**How:**
+
+1. In `signal-executor.ts`:
+   - Add `private poolBalance: number` initialized to the signal pipeline's capital pool (from `runner.ts` wiring).
+   - On every successful `executePaper` / `executeLive` open: `this.poolBalance -= ourSize; this.riskManager.updateBalance(this.poolBalance);`
+   - On every close (wherever signal closes — likely in lifecycle handler called from runner): `this.poolBalance += ourSize + pnl; this.riskManager.updateBalance(this.poolBalance);`
+   - Same handling for rollback / stop-loss close paths.
+2. Same pattern in `copy-executor.ts` (currently disabled but should still be wired for completeness).
+3. Verify: simulate a losing streak in a backtest harness; confirm the per-pipeline DD breaker fires at 14% of pool (not 14% of bot-wide).
+4. Optional cleanup: `paperEngine.syncState()` currently still updates the `'global'` RM's balance — that's correct (cash ledger) but ensure no remaining code path treats it as a gate. Remove the `riskCheck` call from `paperEngine.executeCopyTrade()` entirely if no per-pipeline RM ever expects it (per-pipeline RMs are now the sole gate).
+
+**Acceptance:** All three pipelines (signal, copy, geopolitics) have working per-pipeline drawdown breakers verifiable via log signature `Drawdown circuit breaker [<pipeline>]`. No "global" or bot-wide DD gate fires from `executeCopyTrade`. Before any live deployment, simulate a 14% pipeline-pool loss and confirm the breaker engages.
+
+**Estimate:** 1-2 hours.
+
+**Hard gate:** Must land BEFORE `PAPER_MODE=false` flip on signal or copy.
+
+**Source:** 2026-05-12 incident — geopolitics paper soak captured zero data for 10 hours because bot-wide DD breaker (signal-pipeline-driven) blocked every geopolitics trade. Fix landed today on geopolitics; same pattern needed elsewhere. See vault Decision Log 2026-05-12 + commit `950982e`.
+
+---
+
+## [Open] — 2026-05-13 — Build 4 gbrain-inspired patterns into HQ memory stack
+
+**What:** Mine 4 transferable patterns from `garrytan/gbrain` (CTDD verdict 2026-05-13, see memory file `project_repo_eval_gbrain.md`) WITHOUT installing gbrain. Build them natively in HQ:
+
+1. **Memory eval harness** (~3-5d) — ~50 hand-curated Q&A pairs from prior sessions + replay script firing each through claude-mem + `~/claude-hq/scripts/memory-probe.sh` + scoring. Produces single retrieval-accuracy % that goes up/down on memory-stack changes. **Build FIRST** — it's the measurement layer that turns #2 and #3 into real pilots instead of vibes (Lesson 20).
+2. **Nightly "dream cycle" synthesis** (~2-3d) — bash + Claude Sonnet API script, cron-fired ~3am, reads day's claude-mem observations + new Decision Log entries + MemPalace drawers, writes single daily digest into `~/.claude/projects/-Users-sunil-rajput/memory/MEMORY.md` (or a dated digest file). Closes the gap: existing stack captures but doesn't synthesise.
+3. **Per-message signal-detector** (~1-2d) — UserPromptSubmit hook fires async Haiku call extracting entities/topics/intent from every message into a signals log. Tighter than Lesson 21's per-task probe; non-blocking.
+4. **MCP server trust boundary** (0d now / 1d when triggered) — `OperationContext.remote = true/false` pattern; tighten behaviour when called from MCP vs local CLI. Only applies once HQ ships its first first-party MCP server (none exist today). Park until that trigger fires.
+
+**Context:** Gbrain itself is SKIP wholesale per memory file `project_repo_eval_gbrain.md` — capability overlaps 80%+ with claude-mem + MemPalace + Obsidian + graphify + recall-stack; bus factor 1 (91% AI-coauthored); 5 weeks old; postinstall hook bypasses Trust Gate per Lesson 6. But these 4 ideas fill real gaps the existing stack doesn't cover (synthesis, measurement, per-message capture, runtime trust).
+
+**Why this matters:** Lesson 20 — pilots without deadline + signal + default action are vibes, not experiments. #1 (eval harness) IS the signal layer. Without it, #2 and #3 are vibes. Building #1 first turns the other patterns into measurable experiments.
+
+**Sequencing:**
+- Critical path: #1 (3-5d) → #2 (2-3d), measure #2 lift via #1
+- Stream B parallel: #3 (1-2d) — independent of #1 and #2
+- #4 deferred until first first-party MCP server exists
+
+**Estimate:** ~7-10 focused working days. ~14-20 calendar days alongside POLYMARKET work + soak monitoring.
+
+**Ongoing cost flag (CTDD):** #2 adds ~$0.10-0.30/night in Sonnet (~$3-9/month). #3 adds ~$0.001/prompt in Haiku (~$1-6/month at current usage). Small but recurring forever.
+
+**Scope-creep risk:** #2 has unbounded growth potential ("also do citation fixing, also do conversation summarisation, also..."). Lock the prompt scope on day 1 — produce ONE daily digest only.
+
+**How to start:**
+1. Re-read memory file `project_repo_eval_gbrain.md` for full context
+2. Build #1 first — eval harness. Curate 50 Q&A pairs from past Decision Log entries / Branch 3 research / handoff memories / PATS strategy audit. Build `~/claude-hq/scripts/memory-eval.sh` that fires each pair through claude-mem + memory-probe.sh and scores answers vs expected.
+3. Establish baseline retrieval-accuracy %.
+4. Build #2 (dream cycle) and #3 (signal-detector) in parallel.
+5. Re-run #1 after each → confirm absolute pp lift.
+
+**Acceptance:**
+- #1 produces a single number (retrieval accuracy %); baseline established; harness re-runnable
+- #2 emits daily digest at ~3am; first 7 days reviewed for usefulness; cost tracked in HQ Watchdog
+- #3 captures signals on every UserPromptSubmit; first 1000 captures reviewed for signal:noise; threshold tuned
+- #4 deferred to a follow-up BACKLOG entry triggered by first-party MCP server creation
+
+**Pilot kill-or-keep deadline (Lesson 20):** 30 days after start of build.
+- **Signal:** #1's accuracy % before vs after #2 + #3 land
+- **Default action on deadline:** drop #2 and #3 if combined lift is <3pp absolute. Keep #1 regardless (the harness has independent value as ongoing regression catch).
+
+**Source:** 2026-05-13 conversation — three-repo CTDD evaluation (gbrain, agentscope, agent-native). User asked which to integrate to make Claude HQ "the most powerful model it can be." CTDD answer: none wholesale; build gbrain's 4 patterns natively. Full context in memory files `project_repo_eval_gbrain.md`, `project_repo_eval_agentscope.md`, `project_repo_eval_agent_native.md`.
+
+---
+
+## [Open] — 2026-05-13 — Borrow AgentScope OTel + A2A patterns when next touching HQ Watchdog / cross-agent comms
+
+**What:** Two pattern-borrows from `agentscope-ai/agentscope` (CTDD verdict 2026-05-13, see memory file `project_repo_eval_agentscope.md`). NOT install — pattern-only:
+
+1. **OpenTelemetry observability shape** — when redesigning HQ Watchdog telemetry, look at AgentScope's OTel span schema BEFORE designing our own. Their pattern: every agent action emits structured spans (Jaeger / Honeycomb / Datadog-compatible).
+2. **A2A (Agent-to-Agent) protocol awareness** — Google-led open standard for cross-ecosystem agent comms. Keep in mind for the day Sunil wants Claude HQ agents to talk to non-Claude agents (Qwen / OpenAI / Gemini). Forward-looking; no action today.
+
+**Context:** AgentScope is institutionally robust (Alibaba Tongyi Lab, 2.5 yrs, 30+ human contributors, Apache 2.0, arXiv-backed, only 14% AI-coauthored) but **wrong shape** for HQ — it's a Python multi-agent framework that would replace Claude Code as our agent, not augment HQ orchestration. SKIP wholesale per memory file `project_repo_eval_agentscope.md`; track these 2 patterns only.
+
+**Why deferred:** Neither pattern is blocking today. HQ Watchdog telemetry works (Lesson 16 enforces plain-English alerts). No cross-ecosystem agent comms needed. Pulling patterns now would be pre-emptive infrastructure debt (Lesson 20).
+
+**Trigger conditions (when to revisit):**
+- HQ Watchdog telemetry redesign starts → fetch the `agentscope/observability/` module via `gh api repos/agentscope-ai/agentscope/contents/src/agentscope/observability`, study span schema, then design ours
+- First non-Claude-agent integration in any HQ project → read their A2A skill + tutorial at `https://doc.agentscope.io/tutorial/task_a2a.html` as reference implementation
+
+**Estimate:** 0.5-1 day per pattern when triggered. Pure pattern-mine, not import.
+
+**How to start (when triggered):** Fetch only the specific files needed via `gh api repos/agentscope-ai/agentscope/contents/<path>`. Do NOT clone whole repo. Do NOT pull the package (53 MB + 40+ transitive deps, owner not on HQ allowlist).
+
+**Acceptance:** When the trigger fires, the relevant AgentScope file is read and the pattern is either adopted (with citation in Obsidian Decision Log) or explicitly rejected (with documented reason). Either way, this BACKLOG entry flips to `[Done]`.
+
+**Source:** 2026-05-13 three-repo evaluation. Full context in memory file `project_repo_eval_agentscope.md`.
+
+---
+
+## [Open] — 2026-05-13 — Register agent-native as Get-Rich-Scheme framework candidate
+
+**What:** Add `BuilderIO/agent-native` (CTDD verdict 2026-05-13, see memory file `project_repo_eval_agent_native.md`) to `~/claude-hq/registry.json` as a **candidate** framework for Get-Rich-Scheme SaaS-pipeline deliverables. Surfaces in Commander Step 2 registry scan when classifying Get-Rich-Scheme tasks; NOT a default; presented alongside other options.
+
+**Status:** Registry entry added in same change as this BACKLOG entry (2026-05-13). `id: agent-native`, `priority: MEDIUM`, `status: candidate`. Pre-install gates remain pending until first actual use.
+
+**Context:** agent-native is **wrong altitude for HQ brain integration** (it's a project-level framework, not orchestration) but DIRECTLY relevant to Get-Rich-Scheme Reddit→SaaS pipeline. Templates Mail / Calendar / Forms / Content / Analytics / Slides / Video / Clips match the shape of apps Get-Rich-Scheme is supposed to validate and launch. CTDD verdict captured in memory file `project_repo_eval_agent_native.md`.
+
+**Why this matters:** When Get-Rich-Scheme Phase 0 starts, the question "what framework do we build the deliverable in?" should have a pre-evaluated answer with known trade-offs, not be re-researched from scratch. The trust signals (bus factor 1, license ambiguity, AI session debris) need to be remembered, not re-discovered.
+
+**Pre-install gates (MANDATORY before any actual install for Get-Rich-Scheme use):**
+1. Read `LICENSE` file directly — README claims MIT but GitHub metadata `license` field is null. CONFIRM MIT content.
+2. Full Trust Gate Tier C review on first clone — owner BuilderIO/steve8708 NOT on HQ allowlist.
+3. Pin commit hash — no formal version tag released yet (project is 2 months old). Don't track `main`.
+4. Accept stack lock-in knowingly: Drizzle + Nitro + React + Remotion + Yjs + shadcn + Cloudflare Workers + partial BuilderIO commercial dependency.
+
+**Estimate:**
+- Registry entry add: 15 min (DONE in same commit as this entry)
+- Pre-install gates when triggered: 1-2h
+- Actual scaffold of first agent-native template: ~1d when needed
+
+**How to start (when Get-Rich-Scheme Phase 0 triggers):**
+1. Re-read memory file `project_repo_eval_agent_native.md` for full verdict and signals
+2. Run the 4 pre-install gates above
+3. Compare agent-native vs alternatives (build from scratch, use other SaaS starters, use no-code)
+4. If selected: clone to `~/projects/get-rich-scheme/templates/` at a pinned commit hash, NOT `main`
+
+**Acceptance:**
+- Registry entry visible to Commander Step 2 scan (DONE 2026-05-13)
+- When Get-Rich-Scheme triggers, agent-native surfaces as ONE candidate (not the only option)
+- First actual use is gated by the 4 pre-install checks above passing
+- This BACKLOG entry flips to `[Done]` when either (a) first actual use begins, or (b) explicit rejection in favour of another framework is documented
+
+**Source:** 2026-05-13 three-repo evaluation. Full context in memory file `project_repo_eval_agent_native.md`.
